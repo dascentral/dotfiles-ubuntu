@@ -89,7 +89,7 @@ Switch to your administrative user, clone the dotfiles repo, and run the script.
 - Fail2Ban
 - Unattended security upgrades
 - A swap file sized to 2GB by default
-- Nginx
+- Nginx with a catch-all default server (rejects unknown Host/SNI)
 - PHP 8.4 with FPM and the standard Laravel extension set
 - MySQL 8.4 LTS from Oracle's official repository, non-interactive install
 - Redis
@@ -139,6 +139,17 @@ sudo systemctl reload php8.4-fpm
 ```
 
 Reload (rather than restart) is graceful: in-flight requests finish on the old workers while new workers start fresh with the updated bytecode cache. The "Optional: passwordless sudo for service reloads" section below covers letting this run without an interactive password prompt.
+
+### Nginx catch-all default server
+
+The provision script installs a catch-all server block at `/etc/nginx/sites-available/00-catch-all` and removes the packaged default site. This block claims `default_server` on ports 80 and 443 and rejects every request that does not match a named server block:
+
+- Plain HTTP requests to the IP (or an unknown `Host` header) get a `444` (connection closed with no response).
+- TLS handshakes with an unknown or missing SNI are rejected at the handshake level via `ssl_reject_handshake on`, so Nginx never exposes a certificate for the wrong hostname.
+
+This matters because without it, Nginx serves whichever site sorts first alphabetically to anyone who hits the droplet by IP or with a spoofed Host header. That leaks the existence of your real sites to scanners and can confuse search engine indexing.
+
+The `00-` prefix sorts before any application server block, making it easy to spot in a directory listing. Your application server blocks should not set `default_server` on their `listen` directives; the catch-all owns that role.
 
 ### Nginx server blocks
 
