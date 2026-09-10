@@ -9,7 +9,6 @@ alias va='vim ~/.dotfiles/shell/.aliases'
 # Directory Switching
 #------------------------------------------------------------------------------------------
 alias dot='cd ~/.dotfiles'
-alias www='cd /var/www/html'
 
 
 #------------------------------------------------------------------------------------------
@@ -26,14 +25,6 @@ alias glog="git log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset
 alias gs='git status'
 alias nah='git reset HEAD --hard'
 alias repush='git pull --rebase && git push'
-alias undo='git undo'
-
-
-#------------------------------------------------------------------------------------------
-# Laravel
-#------------------------------------------------------------------------------------------
-alias artisan='php artisan'
-alias routes='php artisan route:list'
 
 
 #------------------------------------------------------------------------------------------

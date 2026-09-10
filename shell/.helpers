@@ -1,6 +1,0 @@
-# Consider creation of a script within the "/bin" folder for greater flexibility
-
-# Create a new directory and enter it
-function mkd() {
-    mkdir -p "$@" && cd "$@"
-}
