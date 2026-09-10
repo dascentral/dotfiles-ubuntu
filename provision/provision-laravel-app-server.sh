@@ -2,16 +2,22 @@
 #
 # provision-laravel-app-server.sh
 #
-# Provision an Ubuntu 24.04 LTS server for Laravel hosting:
-#   Nginx, PHP 8.4-FPM, MySQL 8.4 LTS, Redis, Supervisor, Composer, Node.js 24.
+# Provision an Ubuntu 26.04 LTS server for Laravel hosting:
+# - Nginx
+# - PHP 8.4-FPM
+# - MySQL 8.4 LTS
+# - Redis
+# - Supervisor
+# - Composer
+# - Node.js 24
 #
-# Run AFTER setup.sh has been run (gates on ~/setup-complete.log).
+# Run AFTER setup.sh has been run (gates on $LOG_SETUP_COMPLETE).
 #
 # Run as the administrative user (NOT root), after:
-#   1. Creating the user and adding to the sudo group
-#   2. Copying your SSH public key to the server
-#   3. Hardening sshd_config (see the companion how-to doc)
-#   4. Running provision/setup.sh (or bin/dotfiles)
+# 1. Creating the user and adding to the sudo group
+# 2. Copying your SSH public key to the server
+# 3. Hardening sshd_config (see the companion how-to doc)
+# 4. Running provision/setup.sh (or bin/dotfiles)
 #
 # Optional environment variables:
 #   PHP_VERSION              defaults to 8.4
@@ -30,7 +36,7 @@ PHP_VERSION="${PHP_VERSION:-8.4}"
 NODE_MAJOR="${NODE_MAJOR:-24}"
 MYSQL_APT_CONFIG_VERSION="${MYSQL_APT_CONFIG_VERSION:-0.8.34-1}"
 
-LOG_FILE="$HOME/provision.log"
+LOG_FILE="$LOG_PROVISION_LARAVEL"
 MYSQL_PASS_FILE="$HOME/.mysql_root_password"
 
 exec > >(tee -a "$LOG_FILE") 2>&1
@@ -49,13 +55,13 @@ if ! sudo -n true 2>/dev/null; then
   sudo -v
 fi
 
-if ! grep -q 'Ubuntu 24.04' /etc/os-release; then
-  echo "This script targets Ubuntu 24.04 LTS. Detected:" >&2
+if ! grep -q 'Ubuntu 26.04' /etc/os-release; then
+  echo "This script targets Ubuntu 26.04 LTS. Detected:" >&2
   grep PRETTY_NAME /etc/os-release >&2
   exit 1
 fi
 
-if [[ ! -f "${HOME}/setup-complete.log" ]]; then
+if [[ ! -f "$LOG_SETUP_COMPLETE" ]]; then
   echo "setup.sh has not been run successfully. Run provision/setup.sh first." >&2
   exit 1
 fi

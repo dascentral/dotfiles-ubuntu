@@ -17,7 +17,7 @@ set -euo pipefail
 source "${HOME}/.dotfiles/lib/config.sh"
 
 SETUP_DIR="${DOTFILES}/provision/setup"
-LOG_FILE="${HOME}/setup.log"
+LOG_FILE="$LOG_SETUP"
 
 exec > >(tee -a "$LOG_FILE") 2>&1
 
@@ -56,5 +56,5 @@ source "${SETUP_DIR}/shell.sh"
 # --- Done ---------------------------------------------------------------------
 
 section "Setup complete"
-date > "${HOME}/setup-complete.log"
+date > "$LOG_SETUP_COMPLETE"
 echo "Log: ${LOG_FILE}"

@@ -111,7 +111,7 @@ DigitalOcean's Ubuntu 24.04 image includes `git` out of the box, so the clone wo
 
 The script is idempotent for the most part. If it fails partway through, fix the cause and re-run; it will skip over what's already in place.
 
-A randomly generated MySQL root password is written to `~/.mysql_root_password` (mode 0600). Read it and store it in 1Password before doing anything else. The script logs its full output to `~/provision.log`.
+A randomly generated MySQL root password is written to `~/.mysql_root_password` (mode 0600). Read it and store it in 1Password before doing anything else. The script logs its full output to `~/provision-laravel.log`.
 
 ## Phase 3: Post-install configuration
 
