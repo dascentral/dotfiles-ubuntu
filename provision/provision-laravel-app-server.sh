@@ -47,7 +47,7 @@ if [[ $EUID -eq 0 ]]; then
 fi
 
 if ! sudo -n true 2>/dev/null; then
-  echo "This script needs sudo. You may be prompted for your password."
+  info "This script needs sudo. You may be prompted for your password."
   sudo -v
 fi
 
