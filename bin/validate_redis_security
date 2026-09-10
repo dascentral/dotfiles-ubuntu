@@ -1,229 +1,111 @@
-#!/bin/bash
-# Save as validate_redis_security_complete.sh
+#!/usr/bin/env bash
+set -euo pipefail
 
-echo "================================"
-echo "Redis Security Validation Test"
-echo "================================"
-echo ""
+source "${HOME}/.dotfiles/lib/config.sh"
 
-PASS=0
-FAIL=0
+ENV_FILE="${1:-}"
 
-# Function to extract password from .env properly
-get_redis_password() {
-    local env_file="$1"
-    local pass=$(sudo grep "^REDIS_PASSWORD=" "$env_file" | cut -d= -f2-)
-    # Remove surrounding quotes
-    pass="${pass%\"}"
-    pass="${pass#\"}"
-    pass="${pass%\'}"
-    pass="${pass#\'}"
-    echo "$pass"
-}
+if [[ -z "${ENV_FILE}" ]]; then
+  echo "Usage: validate_redis_security /path/to/app/.env" >&2
+  exit 1
+fi
 
-# Set paths
-ENV_FILE="/var/www/html/intranet/.env"
+if [[ ! -f "${ENV_FILE}" ]]; then
+  echo "Error: .env file not found at ${ENV_FILE}" >&2
+  exit 1
+fi
+
 REDIS_CONF="/etc/redis/redis.conf"
+PASSES=0
+FAILS=0
 
-if [ ! -f "$ENV_FILE" ]; then
-    echo "❌ ERROR: .env file not found at $ENV_FILE"
-    exit 1
-fi
-
-# Get the Redis password
-REDIS_PASS=$(get_redis_password "$ENV_FILE")
-
-# Function to check a test
-check_test() {
-    if [ $1 -eq 0 ]; then
-        echo "✅ PASS: $2"
-        ((PASS++))
-    else
-        echo "❌ FAIL: $2"
-        ((FAIL++))
-    fi
+get_redis_password() {
+  local pass
+  pass=$(sudo grep "^REDIS_PASSWORD=" "$1" | cut -d= -f2-)
+  pass="${pass%\"}"
+  pass="${pass#\"}"
+  pass="${pass%\'}"
+  pass="${pass#\'}"
+  echo "${pass}"
 }
 
-# Test 1: External port access
-echo "Test 1: External Access Check"
-timeout 2 bash -c "cat < /dev/null > /dev/tcp/0.0.0.0/6379" 2>/dev/null
-check_test $? "Port 6379 not accessible on all interfaces"
+check() {
+  if [[ $1 -eq 0 ]]; then
+    echo "  PASS: $2"
+    ((PASSES++))
+  else
+    echo "  FAIL: $2"
+    ((FAILS++))
+  fi
+}
 
-# Test 2: Requires authentication
+REDIS_PASS=$(get_redis_password "${ENV_FILE}")
+
+section "Redis Security Validation"
+
+# Authentication
 echo ""
-echo "Test 2: Authentication Required"
+echo "Authentication"
 redis-cli ping 2>&1 | grep -q "NOAUTH"
-check_test $? "Redis requires authentication"
+check $? "Requires authentication"
 
-# Test 3: Verify we can connect WITH password
-echo ""
-echo "Test 3: Password Authentication Works"
-redis-cli -a "$REDIS_PASS" ping 2>/dev/null | grep -q "PONG"
-check_test $? "Can connect with password from .env"
+redis-cli -a "${REDIS_PASS}" ping 2>/dev/null | grep -q "PONG"
+check $? "Password from .env works"
 
-# Test 4: Network Binding (check config file since CONFIG is disabled)
-echo ""
-echo "Test 4: Network Binding"
-if grep -E "^bind\s+127\.0\.0\.1" "$REDIS_CONF" > /dev/null; then
-    BIND_CONFIG=$(grep -E "^bind\s+" "$REDIS_CONF" | tail -1)
-    echo "  Config file shows: $BIND_CONFIG"
-    check_test 0 "Redis bound to localhost (verified in config file)"
+if [[ ${#REDIS_PASS} -ge 20 ]]; then
+  check 0 "Password strength (${#REDIS_PASS} chars)"
 else
-    check_test 1 "Redis bound to localhost (not found in config)"
+  check 1 "Password strength (only ${#REDIS_PASS} chars, want 20+)"
 fi
 
-# Test 5: Protected mode (check config file since CONFIG is disabled)
+# Network binding
 echo ""
-echo "Test 5: Protected Mode"
-if grep -E "^protected-mode\s+yes" "$REDIS_CONF" > /dev/null; then
-    check_test 0 "Protected mode enabled (verified in config file)"
-else
-    check_test 1 "Protected mode not enabled in config"
+echo "Network binding"
+
+if [[ -f "${REDIS_CONF}" ]]; then
+  grep -qE "^bind\s+127\.0\.0\.1" "${REDIS_CONF}"
+  check $? "Config binds to localhost"
+
+  grep -qE "^protected-mode\s+yes" "${REDIS_CONF}"
+  check $? "Protected mode enabled"
 fi
 
-# Test 6: CONFIG command is disabled (this is GOOD!)
-echo ""
-echo "Test 6: CONFIG Command Disabled"
-OUTPUT=$(redis-cli -a "$REDIS_PASS" CONFIG GET bind 2>&1)
-if echo "$OUTPUT" | grep -qi "unknown command\|renamed"; then
-    check_test 0 "CONFIG command is properly disabled (security feature!)"
+if command -v ss >/dev/null 2>&1; then
+  BIND_CHECK=$(sudo ss -tlnp | grep :6379 || true)
+elif command -v netstat >/dev/null 2>&1; then
+  BIND_CHECK=$(sudo netstat -tlnp | grep :6379 || true)
 else
-    check_test 1 "CONFIG command is still enabled (security risk)"
+  BIND_CHECK=""
 fi
 
-# Test 7: Other dangerous commands disabled
+if [[ -n "${BIND_CHECK}" ]]; then
+  if echo "${BIND_CHECK}" | grep -qE "127\.0\.0\.1:6379|::1:6379"; then
+    check 0 "Listening on localhost only"
+  elif echo "${BIND_CHECK}" | grep -q "0.0.0.0:6379"; then
+    check 1 "Listening on ALL interfaces"
+  else
+    check 0 "Binding appears secure"
+  fi
+else
+  echo "  SKIP: Could not verify network binding (no ss/netstat)"
+fi
+
+# Dangerous commands
 echo ""
-echo "Test 7: Other Dangerous Commands Disabled"
-for cmd in FLUSHDB FLUSHALL SHUTDOWN; do
-    OUTPUT=$(redis-cli -a "$REDIS_PASS" $cmd 2>&1)
-    if echo "$OUTPUT" | grep -qi "unknown command\|renamed"; then
-        echo "  ✅ $cmd is disabled"
-    else
-        echo "  ❌ $cmd is still ENABLED - CRITICAL!"
-        ((FAIL++))
-    fi
+echo "Dangerous commands"
+for cmd in CONFIG FLUSHDB FLUSHALL SHUTDOWN; do
+  OUTPUT=$(redis-cli -a "${REDIS_PASS}" "${cmd}" 2>&1 || true)
+  if echo "${OUTPUT}" | grep -qi "unknown command\|renamed"; then
+    check 0 "${cmd} is disabled"
+  else
+    check 1 "${cmd} is still enabled"
+  fi
 done
 
-# Test 8: Password strength
+# Summary
 echo ""
-echo "Test 8: Password Strength"
-PASS_LENGTH=${#REDIS_PASS}
-if [ $PASS_LENGTH -ge 20 ]; then
-    check_test 0 "Password is strong ($PASS_LENGTH characters)"
-else
-    check_test 1 "Password should be stronger (Only $PASS_LENGTH characters)"
-fi
+section "Results: ${PASSES} passed, ${FAILS} failed"
 
-# Test 9: Verify actual network binding via netstat
-echo ""
-echo "Test 9: Actual Network Binding (via netstat)"
-NETSTAT_OUTPUT=$(sudo netstat -tlnp | grep :6379)
-if echo "$NETSTAT_OUTPUT" | grep -q "127.0.0.1:6379\|::1:6379"; then
-    echo "  Listening on: $(echo $NETSTAT_OUTPUT | awk '{print $4}')"
-    check_test 0 "Redis listening on localhost only (verified via netstat)"
-elif echo "$NETSTAT_OUTPUT" | grep -q "0.0.0.0:6379"; then
-    check_test 1 "Redis listening on ALL interfaces (DANGEROUS!)"
-else
-    check_test 0 "Redis port binding appears secure"
-fi
-
-# Test 10: Check for CVE-2025-49844 specific vulnerability (FIXED)
-echo ""
-echo "Test 10: CVE-2025-49844 Vulnerability (Lua Engine)"
-# Try to execute Lua script without auth
-LUA_OUTPUT=$(redis-cli EVAL 'return redis.call("ping")' 0 2>&1)
-if echo "$LUA_OUTPUT" | grep -q "NOAUTH"; then
-    check_test 0 "Lua engine requires authentication"
-elif echo "$LUA_OUTPUT" | grep -q "PONG"; then
-    check_test 1 "Lua engine DOES NOT require authentication - CRITICAL!"
-else
-    # Alternative check - if EVAL command itself is disabled
-    if echo "$LUA_OUTPUT" | grep -qi "unknown command"; then
-        check_test 0 "EVAL command is disabled (even more secure!)"
-    else
-        echo "  Debug: Unexpected output: $LUA_OUTPUT"
-        check_test 1 "Cannot verify Lua authentication requirement"
-    fi
-fi
-
-# Test 11: Information Disclosure
-echo ""
-echo "Test 11: Information Disclosure"
-redis-cli INFO server 2>&1 | grep -q "NOAUTH"
-check_test $? "Server info requires authentication"
-
-# Test 12: Configuration File Check (FIXED)
-echo ""
-echo "Test 12: Configuration File Check"
-# Check multiple ways Redis might be running
-REDIS_PROCESS=$(ps aux | grep redis-server | grep -v grep)
-if echo "$REDIS_PROCESS" | grep -q "127.0.0.1:6379\|localhost:6379"; then
-    # Redis is bound to localhost (good!)
-    echo "  Redis bound to: localhost:6379 ✓"
-    
-    # Check systemd service for config file
-    if systemctl is-active --quiet redis || systemctl is-active --quiet redis-server; then
-        SERVICE_NAME=$(systemctl is-active --quiet redis && echo "redis" || echo "redis-server")
-        CONFIG_IN_SERVICE=$(sudo systemctl cat $SERVICE_NAME | grep -E "ExecStart.*redis.conf" | grep -oE "/[^ ]+\.conf")
-        if [[ -n "$CONFIG_IN_SERVICE" ]]; then
-            echo "  Config file from systemd: $CONFIG_IN_SERVICE"
-            check_test 0 "Redis configuration verified"
-        else
-            # Still OK if Redis is bound correctly
-            check_test 0 "Redis bound to localhost (config method unverified but secure)"
-        fi
-    else
-        check_test 0 "Redis bound to localhost (verified from process)"
-    fi
-else
-    check_test 1 "Cannot verify Redis configuration"
-fi
-
-# Additional Test: Verify actual binding one more way
-echo ""
-echo "Test 13: Network Security Verification"
-# Use ss or netstat to verify actual binding
-if command -v ss >/dev/null 2>&1; then
-    BIND_CHECK=$(sudo ss -tlnp | grep :6379)
-elif command -v netstat >/dev/null 2>&1; then
-    BIND_CHECK=$(sudo netstat -tlnp | grep :6379)
-else
-    BIND_CHECK=""
-fi
-
-if [[ -n "$BIND_CHECK" ]]; then
-    if echo "$BIND_CHECK" | grep -qE "127\.0\.0\.1:6379|::1:6379|localhost:6379"; then
-        echo "  Network binding confirmed: localhost only"
-        check_test 0 "Network binding secure"
-    elif echo "$BIND_CHECK" | grep -q "0.0.0.0:6379"; then
-        check_test 1 "Redis exposed on all interfaces - CRITICAL!"
-    else
-        echo "  Binding info: $BIND_CHECK"
-        check_test 0 "Network binding appears secure"
-    fi
-else
-    # Can't verify with network tools, but process shows localhost binding
-    check_test 0 "Process shows localhost binding"
-fi
-
-echo ""
-echo "================================"
-echo "SECURITY VALIDATION SUMMARY"
-echo "================================"
-echo "✅ Passed: $PASS tests"
-echo "❌ Failed: $FAIL tests"
-echo ""
-
-if [ $FAIL -eq 0 ]; then
-    echo "🎉 SUCCESS: Redis is properly secured against CVE-2025-49844!"
-    echo ""
-    echo "Security measures verified:"
-    echo "• Authentication required ✓"
-    echo "• Bound to localhost only ✓"  
-    echo "• Protected mode enabled ✓"
-    echo "• ALL dangerous commands disabled ✓"
-    echo "• External access blocked ✓"
-    echo "• Lua engine protected ✓"
-else
-    echo "⚠️  WARNING: Some security tests failed. Review and fix immediately!"
+if [[ ${FAILS} -gt 0 ]]; then
+  exit 1
 fi

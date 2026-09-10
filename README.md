@@ -1,42 +1,30 @@
 # Ubuntu dotfiles
 
-## Introduction
-
-Ubuntu dotfiles is a series of customizations that help me personalize and maintain an Ubuntu web server.
-
-I maintain a personal [dotfiles](https://github.com/dascentral/dotfiles) repository that speaks to the philosophy of this type of repository and contains links to many other repositories that you may use for inspiration.
-
-### Assumptions
-
-The scripts within this repo rely upon a number of assumptions that are not as well documented as I might like. If you set up your Ubuntu servers in a manner similar to me, these scripts may work very well for you. If not, I admit they may not error as gracefully as they should.
-
-While I would love for these scripts to be helpful to others, they exist primarily to faciltiate my systems administration activities and address only a very small sliver of the needs within the systems administration or DevOps world.
+Personal dotfiles and infrastructure-as-text for Ubuntu servers running Laravel applications.
 
 ## Installation
 
-First, clone the repository.
+Clone the repository and run the setup script.
 
 ```bash
 git clone https://github.com/dascentral/ubuntu-dotfiles.git ~/.dotfiles
+cd ~/.dotfiles/provision
+./setup.sh
 ```
 
-The installation script in the root of the repository will install the following:
+This installs base utilities, configures system defaults (timezone, journald, swap), sets up security (UFW, Fail2Ban, unattended upgrades), and configures the shell (zsh, Oh My Zsh, plugins, dotfile symlinks).
 
-* [Nginx](https://www.nginx.com)
-* [PHP](https://www.php.net) — v8.2, v8.1, and v8.0
-* [Composer](https://getcomposer.org)
-* [Redis](https://redis.io)
-* [Certbot](https://certbot.eff.org)
-* [Oh My Zsh](https://ohmyz.sh)
-* Various Ubuntu utilities — e.g., curl, git, htop, etc.
+For Laravel app servers, run the provisioning script after setup:
 
 ```bash
-cd ~/.dotfiles && ./install.sh
+./provision-laravel-app-server.sh
 ```
+
+This adds Nginx, PHP-FPM, MySQL 8.4 LTS, Redis, Supervisor, Composer, and Node.js. See `provision/README.md` for the full how-to guide.
 
 ## Staying up-to-date
 
-I have created a script simply titled `dotfiles` that can be run regularly to ensure the system stays up-to-date. Since this command lives within the `~/.dotfiles/bin` folder, it can be executed from anywhere within the system.
+The `dotfiles` command pulls the latest repo changes and re-runs `setup.sh`. It lives in `~/.dotfiles/bin` and can be executed from anywhere.
 
 ```bash
 dotfiles

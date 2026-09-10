@@ -6,7 +6,7 @@
 
 ## Introduction
 
-This document covers provisioning a hardened Ubuntu 24.04 droplet for Laravel application hosting. The bulk of the software install is automated by the companion `provision.sh` script. Manual steps remain for anything that's risky to automate (SSH hardening) or requires per-host context (TLS certificates, application configuration).
+This document covers provisioning a hardened Ubuntu 24.04 droplet for Laravel application hosting. The bulk of the software install is automated by the companion `provision-laravel-app-server.sh` script (run after `setup.sh` has prepared the base system). Manual steps remain for anything that's risky to automate (SSH hardening) or requires per-host context (TLS certificates, application configuration).
 
 Recommended droplet size for a Laravel workload running Horizon, Pulse, and a Vite build pipeline: 4GB RAM, 2 vCPU. The 2GB tier reliably hits OOM during `composer install` or `npm run build` once any meaningful application traffic is present.
 
@@ -103,7 +103,8 @@ The script also applies a small set of opinionated tuning defaults; see the "Tun
 ssh [username]@[ip_address]
 git clone https://github.com/dascentral/ubuntu-dotfiles.git ~/.dotfiles
 cd ~/.dotfiles/provision
-./provision.sh
+./setup.sh
+./provision-laravel-app-server.sh
 ```
 
 DigitalOcean's Ubuntu 24.04 image includes `git` out of the box, so the clone works on a fresh droplet. If you're ever provisioning on a more minimal image, install git first with `sudo apt-get update && sudo apt-get install -y git`.

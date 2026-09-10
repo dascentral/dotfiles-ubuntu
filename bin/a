@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-source ${HOME}/.dotfiles/shell/.functions
+source "${HOME}/.dotfiles/lib/config.sh"
 
 if ! laravel_application_root; then
     abort "You are not in the root of a Laravel application."
 fi
 
 message="artisan"
-if [ $# -gt 0 ]; then
+if [[ "$#" -gt 0 ]]; then
     message+=" ${@}"
 fi;
 

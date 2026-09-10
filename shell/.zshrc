@@ -104,21 +104,13 @@ fi
 
 ############
 
-# Source Aliases
-source ${HOME}/.dotfiles/shell/.aliases
-[ -s "${HOME}/.aliases-local" ] && source ${HOME}/.aliases-local
+# Source shared config (colors, functions)
+source "${HOME}/.dotfiles/lib/config.sh"
 
-# Source Helpers
-source ${HOME}/.dotfiles/shell/.helpers
+# Source aliases
+source "${HOME}/.dotfiles/shell/.aliases"
+[[ -s "${HOME}/.aliases-local" ]] && source "${HOME}/.aliases-local"
 
 # Path additions
-#export PATH=$PATH:/usr/local/sbin
-export PATH=$PATH:~/.composer/vendor/bin
-export PATH=$PATH:~/.dotfiles/bin
-
-# NVM
-if [ -e "$HOME/.nvm" ]; then
-  export NVM_DIR="$HOME/.nvm"
-  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-  [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
-fi
+export PATH="${PATH}:${HOME}/.composer/vendor/bin"
+export PATH="${PATH}:${HOME}/.dotfiles/bin"
