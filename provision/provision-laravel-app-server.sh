@@ -61,8 +61,8 @@ if ! grep -q 'Ubuntu 24.04' /etc/os-release; then
   exit 1
 fi
 
-if ! command -v ag >/dev/null 2>&1; then
-  echo "ag (silversearcher) not found. Run provision/setup.sh first." >&2
+if [[ ! -f "${HOME}/setup-complete.log" ]]; then
+  echo "setup.sh has not been run successfully. Run provision/setup.sh first." >&2
   exit 1
 fi
 

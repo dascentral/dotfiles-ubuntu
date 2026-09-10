@@ -8,7 +8,7 @@ section "Shell environment"
 sudo apt-get install -y -qq zsh
 
 if [[ ! -d "${HOME}/.oh-my-zsh" ]]; then
-  RUNZSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+  CHSH=no RUNZSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
   ok "Oh My Zsh installed"
 else
   ok "Oh My Zsh already installed (self-updates)"

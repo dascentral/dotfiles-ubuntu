@@ -56,4 +56,5 @@ source "${SETUP_DIR}/shell.sh"
 # --- Done ---------------------------------------------------------------------
 
 section "Setup complete"
+date > "${HOME}/setup-complete.log"
 echo "Log: ${LOG_FILE}"

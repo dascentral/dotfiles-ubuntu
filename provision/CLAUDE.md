@@ -13,7 +13,7 @@ These are load-bearing. Do not remove without an explicit conversation.
 - **`provision-laravel-app-server.sh` targets Ubuntu 24.04 LTS only.** The OS guard is intentional. Add a parallel branch for other versions rather than weakening the guard.
 - **Both must remain idempotent.** Every step checks for existing state or relies on apt's idempotence.
 - **Both run as a non-root sudo user, not root.** The pre-flight check enforces this.
-- **`provision-laravel-app-server.sh` gates on `ag`.** Verifies `setup.sh` has been run first.
+- **`provision-laravel-app-server.sh` gates on `~/setup-complete.log`.** Verifies `setup.sh` has completed successfully.
 - **`provision-laravel-app-server.sh` is self-contained.** Uses `set -euo pipefail` with its own `section`/`ok` helpers, mirroring output to `~/provision.log` via `exec > >(tee -a "$LOG_FILE") 2>&1`. Does not source `lib/config.sh`.
 - **`setup.sh` sources `lib/config.sh`** for shared `section`/`ok` helpers. Mirrors output to `~/setup.log`.
 - **PHP-FPM, Horizon, and app files all run as the admin user (not www-data).** Deliberate choice to avoid permission issues. Don't revert the pool config.
