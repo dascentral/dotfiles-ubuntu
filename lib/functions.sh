@@ -31,7 +31,7 @@ section() {
 }
 
 ok() {
-    printf "${GREEN}    ok:${NC} %s\n" "$1"
+    printf "${GREEN}✔${NC} %s\n" "$1"
 }
 
 escape() {

@@ -5,7 +5,7 @@
 # Provision an Ubuntu 24.04 LTS server for Laravel hosting:
 #   Nginx, PHP 8.4-FPM, MySQL 8.4 LTS, Redis, Supervisor, Composer, Node.js 24.
 #
-# Run AFTER setup.sh has been run (gates on `ag` being present).
+# Run AFTER setup.sh has been run (gates on ~/setup-complete.log).
 #
 # Run as the administrative user (NOT root), after:
 #   1. Creating the user and adding to the sudo group
@@ -22,6 +22,8 @@
 
 set -euo pipefail
 
+source "${HOME}/.dotfiles/lib/config.sh"
+
 # --- Configuration -----------------------------------------------------------
 
 PHP_VERSION="${PHP_VERSION:-8.4}"
@@ -32,14 +34,6 @@ LOG_FILE="$HOME/provision.log"
 MYSQL_PASS_FILE="$HOME/.mysql_root_password"
 
 exec > >(tee -a "$LOG_FILE") 2>&1
-
-section() {
-  printf '\n\033[1;34m==> %s\033[0m\n' "$1"
-}
-
-ok() {
-  printf '\033[1;32m    ok:\033[0m %s\n' "$1"
-}
 
 # --- Pre-flight checks -------------------------------------------------------
 
