@@ -13,7 +13,7 @@ ok "UFW active, OpenSSH allowed"
 
 section "Fail2Ban"
 sudo apt-get install -y -qq fail2ban
-sudo systemctl enable --now fail2ban >/dev/null
+sudo systemctl enable --now fail2ban >/dev/null 2>&1
 ok "Fail2Ban running"
 
 section "Unattended security upgrades"
