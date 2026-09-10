@@ -9,7 +9,6 @@
 # - Redis
 # - Supervisor
 # - Composer
-# - Node.js 24
 #
 # Run AFTER setup.sh has been run (gates on $LOG_SETUP_COMPLETE).
 #
@@ -21,7 +20,6 @@
 #
 # Optional environment variables:
 #   PHP_VERSION              defaults to 8.4
-#   NODE_MAJOR               defaults to 24
 #   MYSQL_APT_CONFIG_VERSION defaults to 0.8.34-1
 #   MYSQL_ROOT_PASSWORD      auto-generated if unset
 #
@@ -33,7 +31,6 @@ source "${HOME}/.dotfiles/lib/config.sh"
 # --- Configuration -----------------------------------------------------------
 
 PHP_VERSION="${PHP_VERSION:-8.4}"
-NODE_MAJOR="${NODE_MAJOR:-24}"
 MYSQL_APT_CONFIG_VERSION="${MYSQL_APT_CONFIG_VERSION:-0.8.34-1}"
 
 LOG_FILE="$LOG_PROVISION_LARAVEL"
@@ -46,8 +43,7 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 section "Pre-flight checks"
 
 if [[ $EUID -eq 0 ]]; then
-  echo "Run this script as your administrative user (with sudo), not as root." >&2
-  exit 1
+  die "Run this script as your administrative user (with sudo), not as root."
 fi
 
 if ! sudo -n true 2>/dev/null; then
@@ -56,14 +52,13 @@ if ! sudo -n true 2>/dev/null; then
 fi
 
 if ! grep -q 'Ubuntu 26.04' /etc/os-release; then
-  echo "This script targets Ubuntu 26.04 LTS. Detected:" >&2
+  warn "This script targets Ubuntu 26.04 LTS. Detected:"
   grep PRETTY_NAME /etc/os-release >&2
   exit 1
 fi
 
 if [[ ! -f "$LOG_SETUP_COMPLETE" ]]; then
-  echo "setup.sh has not been run successfully. Run provision/setup.sh first." >&2
-  exit 1
+  die "setup.sh has not been run successfully. Run provision/setup.sh first."
 fi
 
 ok "Running as $(whoami) on $(lsb_release -ds)"
@@ -223,24 +218,13 @@ else
   php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php');"
   ACTUAL_CHECKSUM="$(php -r "echo hash_file('sha384', '/tmp/composer-setup.php');")"
   if [[ "$EXPECTED_CHECKSUM" != "$ACTUAL_CHECKSUM" ]]; then
-    echo "Composer installer checksum mismatch. Aborting." >&2
+    warn "Composer installer checksum mismatch. Aborting."
     rm -f /tmp/composer-setup.php
     exit 1
   fi
   sudo php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer --quiet
   rm -f /tmp/composer-setup.php
   ok "Composer $(composer --version --no-ansi 2>/dev/null | head -n1)"
-fi
-
-# --- Node.js (NodeSource) ----------------------------------------------------
-
-section "Node.js ${NODE_MAJOR}.x LTS"
-if command -v node >/dev/null 2>&1 && node --version | grep -q "^v${NODE_MAJOR}\."; then
-  ok "Node.js already installed: $(node --version)"
-else
-  curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | sudo -E bash - >/dev/null
-  sudo apt-get install -y -qq nodejs
-  ok "Node.js $(node --version), npm $(npm --version)"
 fi
 
 # --- Done --------------------------------------------------------------------

@@ -5,8 +5,8 @@ Personal dotfiles and infrastructure-as-text for Ubuntu servers running Laravel 
 ## Layout
 
 - `provision/setup.sh` — idempotent system customization entrypoint (sources modular scripts from `provision/setup/`). Invoked day-to-day via `bin/dotfiles`.
-- `provision/setup/` — modular setup scripts: `system-update.sh`, `utilities.sh`, `system-defaults.sh`, `security.sh`, `shell.sh`.
-- `provision/provision-laravel-app-server.sh` — one-shot Laravel app server provisioning (Nginx, PHP, MySQL, Redis, Supervisor, Composer, Node.js). Self-contained. See `provision/CLAUDE.md`.
+- `provision/setup/` — modular setup scripts: `system-update.sh`, `utilities.sh`, `system-defaults.sh`, `security.sh`, `nodejs.sh`, `shell.sh`.
+- `provision/provision-laravel-app-server.sh` — one-shot Laravel app server provisioning (Nginx, PHP, MySQL, Redis, Supervisor, Composer). Self-contained. See `provision/CLAUDE.md`.
 - `lib/` — shared shell library: `config.sh` (loader), `colors.sh`, `functions.sh`.
 - `bin/` — user-facing commands on `PATH` (`dotfiles`, `a`, `validate_redis_security`, etc.).
 - `shell/` — `.zshrc`, `.aliases`, plus `sudoers.d/php-fpm`.

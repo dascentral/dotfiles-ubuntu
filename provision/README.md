@@ -89,13 +89,13 @@ Switch to your administrative user, clone the dotfiles repo, and run the script.
 - Fail2Ban
 - Unattended security upgrades
 - A swap file sized to 2GB by default
+- Node.js 24 LTS via NodeSource
 - Nginx with a catch-all default server (rejects unknown Host/SNI)
 - PHP 8.4 with FPM and the standard Laravel extension set
 - MySQL 8.4 LTS from Oracle's official repository, non-interactive install
 - Redis
 - Supervisor
 - Composer
-- Node.js 24 LTS via NodeSource
 
 The script also applies a small set of opinionated tuning defaults; see the "Tuning decisions" section below for the what and the why.
 

@@ -3,7 +3,7 @@
 Two scripts live here:
 
 - `setup.sh` — idempotent system customization for any Ubuntu server. Sources modular scripts from `setup/`. Safe to re-run via `bin/dotfiles`.
-- `provision-laravel-app-server.sh` — one-shot Laravel app server provisioning (Nginx, PHP 8.4-FPM, MySQL 8.4 LTS, Redis, Supervisor, Composer, Node.js 24). Run after `setup.sh`.
+- `provision-laravel-app-server.sh` — one-shot Laravel app server provisioning (Nginx, PHP 8.4-FPM, MySQL 8.4 LTS, Redis, Supervisor, Composer). Run after `setup.sh`.
 
 ## Hard Constraints
 
@@ -47,12 +47,12 @@ Deliberately not tuned: Redis `maxmemory`, MySQL slow query log, PHP-FPM `pm.*` 
 Overridable env vars at the top of `provision-laravel-app-server.sh`:
 
 - `PHP_VERSION` (default 8.4)
-- `NODE_MAJOR` (default 24)
 - `MYSQL_APT_CONFIG_VERSION` (default 0.8.34-1)
 
-Overridable env var in `setup/system-defaults.sh`:
+Overridable env vars in `setup/`:
 
-- `SWAP_SIZE_GB` (default 2)
+- `SWAP_SIZE_GB` (default 2, in `system-defaults.sh`)
+- `NODE_MAJOR` (default 24, in `nodejs.sh`)
 
 If provisioning fails on the `repo.mysql.com` download, check [dev.mysql.com/downloads/repo/apt/](https://dev.mysql.com/downloads/repo/apt/) for the current version.
 

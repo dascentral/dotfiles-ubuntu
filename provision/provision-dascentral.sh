@@ -8,7 +8,7 @@
 # - Ghostscript
 # - LibreOffice
 #
-# Run AFTER provision-laravel-app-server.sh (requires Node.js).
+# Run AFTER provision-laravel-app-server.sh (requires PHP-FPM).
 #
 # Optional environment variables:
 #   APP_USER     defaults to forge
@@ -35,8 +35,7 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 section "Pre-flight checks"
 
 if [[ $EUID -eq 0 ]]; then
-  echo "Run this script as your administrative user (with sudo), not as root." >&2
-  exit 1
+  die "Run this script as your administrative user (with sudo), not as root."
 fi
 
 if ! sudo -n true 2>/dev/null; then
@@ -45,24 +44,17 @@ if ! sudo -n true 2>/dev/null; then
 fi
 
 if ! grep -q 'Ubuntu 26.04' /etc/os-release; then
-  echo "This script targets Ubuntu 26.04 LTS. Detected:" >&2
+  warn "This script targets Ubuntu 26.04 LTS. Detected:"
   grep PRETTY_NAME /etc/os-release >&2
   exit 1
 fi
 
 if [[ ! -f "$LOG_PROVISION_LARAVEL" ]]; then
-  echo "provision-laravel-app-server.sh has not been run. Run it first." >&2
-  exit 1
-fi
-
-if ! command -v node >/dev/null 2>&1; then
-  echo "Node.js is required. Run provision-laravel-app-server.sh first." >&2
-  exit 1
+  die "provision-laravel-app-server.sh has not been run. Run it first."
 fi
 
 if ! id "$APP_USER" >/dev/null 2>&1; then
-  echo "User '${APP_USER}' does not exist." >&2
-  exit 1
+  die "User '${APP_USER}' does not exist."
 fi
 
 ok "Running as $(whoami) on $(lsb_release -ds)"

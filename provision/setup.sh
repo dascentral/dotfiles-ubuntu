@@ -26,8 +26,7 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 section "Pre-flight checks"
 
 if [[ $EUID -eq 0 ]]; then
-  echo "Run this script as your administrative user (with sudo), not as root." >&2
-  exit 1
+  die "Run this script as your administrative user (with sudo), not as root."
 fi
 
 if ! sudo -n true 2>/dev/null; then
@@ -36,7 +35,7 @@ if ! sudo -n true 2>/dev/null; then
 fi
 
 if ! grep -qi 'ubuntu' /etc/os-release; then
-  echo "This script targets Ubuntu. Detected:" >&2
+  warn "This script targets Ubuntu. Detected:"
   grep PRETTY_NAME /etc/os-release >&2
   exit 1
 fi
@@ -51,6 +50,7 @@ source "${SETUP_DIR}/system-update.sh"
 source "${SETUP_DIR}/utilities.sh"
 source "${SETUP_DIR}/system-defaults.sh"
 source "${SETUP_DIR}/security.sh"
+source "${SETUP_DIR}/nodejs.sh"
 source "${SETUP_DIR}/shell.sh"
 
 # --- Done ---------------------------------------------------------------------
