@@ -3,7 +3,7 @@
 Two scripts live here:
 
 - `setup.sh` — idempotent system customization for any Ubuntu server. Sources modular scripts from `setup/`. Safe to re-run via `bin/dotfiles`.
-- `provision-laravel-app-server.sh` — one-shot Laravel app server provisioning (Nginx, PHP 8.4-FPM, MySQL 8.4 LTS, Redis, Supervisor, Composer). Run after `setup.sh`.
+- `provision-laravel-app-server.sh` — one-shot Laravel app server provisioning (Nginx, PHP 8.4-FPM, MySQL 8.4 LTS, Redis, Supervisor, Composer). Sources modular scripts from `laravel/`. Run after `setup.sh`.
 
 ## Hard Constraints
 
