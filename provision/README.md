@@ -123,6 +123,15 @@ cd ~/.dotfiles/provision
 
 DigitalOcean's Ubuntu images include `git` out of the box, so the clone works on a fresh droplet. If you're ever provisioning on a more minimal image, install git first with `sudo apt-get update && sudo apt-get install -y git`.
 
+A few settings can be overridden with environment variables when you run the scripts:
+
+- `SWAP_SIZE_GB` (default 2) sets the swap file size in `setup.sh`.
+- `NODE_MAJOR` (default 24) picks the Node.js LTS line in `setup.sh`.
+- `PHP_VERSION` (default 8.4) picks the PHP line in `provision-laravel-app-server.sh` and `provision-dascentral.sh`.
+- `MYSQL_APT_CONFIG_VERSION` (default 0.8.34-1) pins Oracle's `mysql-apt-config` package on 22.04 and 24.04. If the `repo.mysql.com` download fails, check [dev.mysql.com/downloads/repo/apt](https://dev.mysql.com/downloads/repo/apt/) for the current version.
+- `MYSQL_ROOT_PASSWORD` (generated if unset) sets the MySQL root password.
+- `APP_USER` (default `forge`) names the application user in `provision-dascentral.sh`.
+
 The script is idempotent for the most part. If it fails partway through, fix the cause and re-run; it will skip over what's already in place.
 
 A randomly generated MySQL root password is written to `~/.mysql_root_password` (mode 0600). Read it and store it in 1Password before doing anything else. The script logs its full output to `~/logs/provision-laravel.log`, replacing the previous run's log.

@@ -4,16 +4,21 @@ set -euo pipefail
 section "MySQL 8.4 LTS"
 if command -v mysql >/dev/null 2>&1; then
   ok "MySQL already installed: $(mysql --version)"
+  if [[ ! -f "$MYSQL_PASS_FILE" ]]; then
+    warn "No ${MYSQL_PASS_FILE}. If root still uses auth_socket, set its password manually."
+  fi
 else
   if [[ -z "${MYSQL_ROOT_PASSWORD:-}" ]]; then
     MYSQL_ROOT_PASSWORD="$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-28)"
   fi
 
   umask 077
-  printf '%s\n' "$MYSQL_ROOT_PASSWORD" > "$MYSQL_PASS_FILE"
-  ok "MySQL root password written to $MYSQL_PASS_FILE"
 
   if ubuntu_version_lt 26.04; then
+    # debconf applies the password during install, so record it first; a
+    # failed install still leaves the password that was handed to the package.
+    printf '%s\n' "$MYSQL_ROOT_PASSWORD" > "$MYSQL_PASS_FILE"
+    ok "MySQL root password written to $MYSQL_PASS_FILE"
     # 22.04 and 24.04 ship MySQL 8.0 (EOL April 2026); install 8.4 LTS from Oracle.
     MYSQL_APT_DEB="mysql-apt-config_${MYSQL_APT_CONFIG_VERSION}_all.deb"
     curl -fsSL "https://repo.mysql.com/${MYSQL_APT_DEB}" -o "/tmp/${MYSQL_APT_DEB}"
@@ -40,6 +45,10 @@ else
     sudo mysql <<SQL
 ALTER USER 'root'@'localhost' IDENTIFIED WITH caching_sha2_password BY '${SQL_PASSWORD}';
 SQL
+    # Written only after the ALTER succeeds, so the file never holds a
+    # password that was not applied.
+    printf '%s\n' "$MYSQL_ROOT_PASSWORD" > "$MYSQL_PASS_FILE"
+    ok "MySQL root password set and written to $MYSQL_PASS_FILE"
   fi
 
   sudo systemctl enable --now mysql >/dev/null
