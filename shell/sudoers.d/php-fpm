@@ -1,3 +1,2 @@
-[user] ALL=NOPASSWD: /usr/sbin/service php8.0-fpm reload
-[user] ALL=NOPASSWD: /usr/sbin/service php8.1-fpm reload
-[user] ALL=NOPASSWD: /usr/sbin/service php8.2-fpm reload
+[user] ALL=NOPASSWD: /usr/bin/systemctl reload php8.4-fpm
+[user] ALL=NOPASSWD: /usr/bin/systemctl reload nginx
