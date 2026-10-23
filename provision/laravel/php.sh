@@ -1,28 +1,36 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-section "PHP ${PHP_VERSION} (via ondrej/php PPA)"
-if ! grep -rq 'ondrej/php' /etc/apt/sources.list.d/ 2>/dev/null; then
-  sudo add-apt-repository -y ppa:ondrej/php
-  sudo apt-get update -qq
+if ubuntu_version_lt 26.04; then
+  section "PHP ${PHP_VERSION} (via ondrej/php PPA)"
+  if ! grep -rq 'ondrej/php' /etc/apt/sources.list.d/ 2>/dev/null; then
+    sudo add-apt-repository -y ppa:ondrej/php
+    sudo apt-get update -qq
+  fi
+else
+  # The Launchpad PPA does not publish for 26.04; packages.sury.org is the
+  # same maintainer's canonical repo there.
+  section "PHP ${PHP_VERSION} (via packages.sury.org)"
+  if ! grep -rq 'packages.sury.org/php' /etc/apt/sources.list.d/ 2>/dev/null; then
+    curl -fsSL https://packages.sury.org/debsuryorg-archive-keyring.deb -o /tmp/debsuryorg-archive-keyring.deb
+    sudo dpkg -i /tmp/debsuryorg-archive-keyring.deb >/dev/null
+    rm -f /tmp/debsuryorg-archive-keyring.deb
+    echo "deb [signed-by=/usr/share/keyrings/debsuryorg-archive-keyring.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" \
+      | sudo tee /etc/apt/sources.list.d/php.list >/dev/null
+    sudo apt-get update -qq
+  fi
 fi
-sudo apt-get install -y -qq \
-  "php${PHP_VERSION}" \
-  "php${PHP_VERSION}-fpm" \
-  "php${PHP_VERSION}-cli" \
-  "php${PHP_VERSION}-common" \
-  "php${PHP_VERSION}-bcmath" \
-  "php${PHP_VERSION}-curl" \
-  "php${PHP_VERSION}-gd" \
-  "php${PHP_VERSION}-intl" \
-  "php${PHP_VERSION}-ldap" \
-  "php${PHP_VERSION}-mbstring" \
-  "php${PHP_VERSION}-mysql" \
-  "php${PHP_VERSION}-opcache" \
-  "php${PHP_VERSION}-readline" \
-  "php${PHP_VERSION}-redis" \
-  "php${PHP_VERSION}-xml" \
-  "php${PHP_VERSION}-zip"
+
+if ! apt-cache show "php${PHP_VERSION}-fpm" >/dev/null 2>&1; then
+  die "php${PHP_VERSION}-fpm is not available on Ubuntu $(ubuntu_version)."
+fi
+
+PHP_EXTENSIONS=(fpm cli common bcmath curl gd intl ldap mbstring mysql readline redis xml zip)
+# OPcache is compiled into core from PHP 8.5 and no longer ships as a package.
+if dpkg --compare-versions "$PHP_VERSION" lt 8.5; then
+  PHP_EXTENSIONS+=(opcache)
+fi
+sudo apt-get install -y -qq "php${PHP_VERSION}" "${PHP_EXTENSIONS[@]/#/php${PHP_VERSION}-}"
 sudo systemctl enable --now "php${PHP_VERSION}-fpm" >/dev/null
 ok "PHP ${PHP_VERSION} and FPM running"
 
