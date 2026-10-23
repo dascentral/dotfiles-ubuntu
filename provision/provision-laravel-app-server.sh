@@ -2,10 +2,10 @@
 #
 # provision-laravel-app-server.sh
 #
-# Provision an Ubuntu 26.04 LTS server for Laravel hosting:
+# Provision an Ubuntu 22.04, 24.04, or 26.04 LTS server for Laravel hosting:
 # - Nginx
 # - PHP 8.4-FPM
-# - MySQL 8.4 LTS
+# - MySQL 8.4 LTS (Oracle on 22.04/24.04, Ubuntu on 26.04)
 # - Redis
 # - Supervisor
 # - Composer
@@ -20,7 +20,7 @@
 #
 # Optional environment variables:
 #   PHP_VERSION              defaults to 8.4
-#   MYSQL_APT_CONFIG_VERSION defaults to 0.8.34-1
+#   MYSQL_APT_CONFIG_VERSION defaults to 0.8.34-1 (22.04/24.04 only)
 #   MYSQL_ROOT_PASSWORD      auto-generated if unset
 #
 
@@ -53,11 +53,7 @@ if ! sudo -n true 2>/dev/null; then
   sudo -v
 fi
 
-if ! grep -q 'Ubuntu 26.04' /etc/os-release; then
-  warn "This script targets Ubuntu 26.04 LTS. Detected:"
-  grep PRETTY_NAME /etc/os-release >&2
-  exit 1
-fi
+require_ubuntu 22.04 24.04 26.04
 
 if [[ ! -f "$LOG_SETUP_COMPLETE" ]]; then
   die "setup.sh has not been run successfully. Run provision/setup.sh first."
