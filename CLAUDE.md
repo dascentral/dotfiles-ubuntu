@@ -11,7 +11,7 @@ Personal dotfiles and infrastructure-as-text for Ubuntu servers running Laravel 
 - `provision/provision-laravel-app-server.sh`: one-shot Laravel app server provisioning (Nginx, PHP, MySQL, Redis, Supervisor, Composer). Sources modules from `provision/software/` and runs `bin/install_php`. See `provision/CLAUDE.md`.
 - `provision/provision-dascentral.sh`: dascentral.com app dependencies, run after the Laravel script.
 - `lib/`: shared shell library: `config.sh` (loader), `colors.sh`, `functions.sh`.
-- `bin/`: user-facing commands on `PATH` (`dotfiles`, `a`, `install_php`, `validate_redis_security`, etc.).
+- `bin/`: user-facing commands on `PATH` (`dotfiles`, `a`, `install_php`, `tune_php`, `validate_redis_security`, etc.).
 - `shell/`: `.zshrc`, `.aliases`, plus `sudoers.d/php-fpm`.
 - `legacy/`: archived reference. Don't extend.
 

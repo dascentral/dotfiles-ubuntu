@@ -3,7 +3,7 @@
 # install_php
 #
 # Install a PHP-FPM version with the standard Laravel extension set and the
-# provisioned OPcache/realpath tuning. Used by provision-laravel-app-server.sh
+# provisioned OPcache/realpath tuning (via tune_php). Used by provision-laravel-app-server.sh
 # on new servers and run directly to add a newer PHP to an existing one.
 #
 # On a server that already has PHP, the new version installs alongside it:
@@ -82,25 +82,11 @@ else
   ok "PHP ${PHP_VERSION} installed"
 fi
 
-section "PHP tuning (OPcache, realpath_cache)"
-FPM_CHANGED=false
-for sapi in fpm cli; do
-  if write_if_changed "/etc/php/${PHP_VERSION}/${sapi}/conf.d/99-tuning.ini" <<'EOF'
-; Provisioned tuning
-opcache.memory_consumption=256
-opcache.interned_strings_buffer=16
-opcache.max_accelerated_files=20000
-opcache.validate_timestamps=0
-realpath_cache_size=4096K
-realpath_cache_ttl=600
-EOF
-  then
-    if [[ "$sapi" == fpm ]]; then FPM_CHANGED=true; fi
-  fi
-done
-ok "OPcache: 256MB / 20k files / no timestamp validation; realpath_cache: 4MB / 600s"
+"${DOTFILES}/bin/tune_php" "$PHP_VERSION"
 
 # --- FPM pool ----------------------------------------------------------------
+
+FPM_CHANGED=false
 
 if [[ -n "$CURRENT_PHP" && "$CURRENT_PHP" != "$PHP_VERSION" ]]; then
   section "PHP-FPM pool settings from ${CURRENT_PHP}"
