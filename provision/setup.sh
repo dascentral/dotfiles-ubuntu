@@ -18,6 +18,7 @@ source "${HOME}/.dotfiles/lib/config.sh"
 
 SYSTEM_DIR="${DOTFILES}/provision/system"
 SOFTWARE_DIR="${DOTFILES}/provision/software"
+SHELL_DIR="${DOTFILES}/provision/shell"
 LOG_FILE="$LOG_SETUP"
 
 mkdir -p "$LOG_DIR"
@@ -55,7 +56,7 @@ source "${SYSTEM_DIR}/defaults.sh"
 source "${SYSTEM_DIR}/security.sh"
 source "${SOFTWARE_DIR}/nodejs.sh"
 source "${SOFTWARE_DIR}/composer.sh"
-source "${SYSTEM_DIR}/shell.sh"
+source "${SHELL_DIR}/zsh.sh"
 
 # --- Done ---------------------------------------------------------------------
 

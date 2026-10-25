@@ -1,6 +1,6 @@
 # Provisioning
 
-`setup.sh` prepares any Ubuntu server and is re-run day-to-day via `bin/dotfiles`, including on the existing 22.04 and 24.04 servers. `provision-laravel-app-server.sh` runs after it on a new 26.04 server, and `provision-dascentral.sh` runs after that. Modules live in `system/` (base system) and `software/` (one per piece of software); the entry scripts decide which to source, so a module can be shared, like `software/composer.sh`. `bin/install_php` installs PHP for the Laravel script and is also run directly to add a newer PHP to existing servers. `provision/README.md` is the human-facing guide and documents every tuning value, overridable setting, and maintenance command.
+`setup.sh` prepares any Ubuntu server and is re-run day-to-day via `bin/dotfiles`, including on the existing 22.04 and 24.04 servers. `provision-laravel-app-server.sh` runs after it on a new 26.04 server, and `provision-dascentral.sh` runs after that. Modules live in `system/` (base OS), `software/` (one per piece of software), and `shell/` (your zsh environment); the entry scripts decide which to source, so a module can be shared, like `software/composer.sh`. `bin/install_php` installs PHP for the Laravel script and is also run directly to add a newer PHP to existing servers. `provision/README.md` is the human-facing guide and documents every tuning value, overridable setting, and maintenance command.
 
 ## Hard Constraints
 
