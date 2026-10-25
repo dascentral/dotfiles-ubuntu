@@ -1,32 +1,20 @@
 # How to set up an Ubuntu Server
 
 **Last updated:** October 2026
-**Target OS:** Ubuntu 22.04 LTS (Jammy Jellyfish), 24.04 LTS (Noble Numbat), or 26.04 LTS (Resolute Raccoon)
+**Target OS:** Ubuntu 26.04 LTS (Resolute Raccoon)
 **Stack:** Nginx, PHP 8.4-FPM, MySQL 8.4 LTS, Redis, Supervisor
 
 ## Introduction
 
-This document covers provisioning a hardened Ubuntu droplet for Laravel application hosting. The bulk of the software install is automated by the companion `provision-laravel-app-server.sh` script (run after `setup.sh` has prepared the base system). Manual steps remain for anything that's risky to automate (SSH hardening) or requires per-host context (TLS certificates, application configuration).
+This document covers provisioning a hardened Ubuntu 26.04 droplet for Laravel application hosting. The bulk of the software install is automated by the companion `provision-laravel-app-server.sh` script (run after `setup.sh` has prepared the base system). Manual steps remain for anything that's risky to automate (SSH hardening) or requires per-host context (TLS certificates, application configuration).
 
 Recommended droplet size for a Laravel workload running Horizon, Pulse, and a Vite build pipeline: 4GB RAM, 2 vCPU. The 2GB tier reliably hits OOM during `composer install` or `npm run build` once any meaningful application traffic is present.
 
-## Release differences
+## A note on package sources
 
-The scripts detect the Ubuntu release from `/etc/os-release` and only do the extra work an older release needs. `provision-laravel-app-server.sh` and `provision-dascentral.sh` refuse to run on anything other than 22.04, 24.04, or 26.04.
+PHP comes from Ondřej Surý's [packages.sury.org/php](https://packages.sury.org/php/) repository. His Launchpad PPA, which older servers use, does not publish for 26.04. The provision script installs his keyring package and adds the repo.
 
-**PHP.** PHP 8.4 comes from Ondřej Surý's packages on every release. On 22.04 and 24.04 that is the ondrej/php Launchpad PPA. The PPA does not publish for 26.04, where Ondřej's canonical repo is [packages.sury.org/php](https://packages.sury.org/php/), so 26.04 installs his keyring package and adds that repo instead. If you override `PHP_VERSION` to 8.5 or later, the script skips the `opcache` package, since OPcache is compiled into core from 8.5.
-
-**Nginx catch-all on 22.04.** 22.04 ships Nginx 1.18, which predates `ssl_reject_handshake`. The catch-all server presents Ubuntu's snakeoil certificate instead, so a TLS request with unknown SNI completes the handshake before getting the `444`. The snakeoil certificate's CN is the droplet's hostname, which is the one thing this leaks.
-
-**needrestart on 22.04.** 22.04's needrestart pops an interactive restart dialog during apt runs, which hangs the scripts. `setup.sh` drops `/etc/needrestart/conf.d/99-noninteractive.conf` to restart services automatically, matching the 24.04+ default.
-
-**MySQL.** 22.04 and 24.04 install MySQL 8.4 LTS from Oracle's repo (see below). 26.04 ships 8.4 LTS natively, and Oracle's `mysql-apt-config` does not recognize 26.04, so the script uses Ubuntu's package there. Ubuntu's package leaves root on `auth_socket`; the script switches root to `caching_sha2_password` with the generated password so the post-install steps are identical on every release.
-
-**Headless Chromium libraries.** 24.04's 64-bit `time_t` transition renamed `libasound2` to `libasound2t64`. `provision-dascentral.sh` picks the right name per release.
-
-## A note on MySQL versions
-
-Ubuntu 22.04 and 24.04 ship MySQL 8.0 in their default repositories, but 8.0 reached end of life on April 21, 2026. On those releases the script installs MySQL 8.4 LTS from Oracle's official APT repository instead. 8.4 is supported through 2032 and is the same line that Ubuntu 26.04 ships natively, so 26.04 uses Ubuntu's own package. Either way the install is non-interactive, with `caching_sha2_password` as the root authentication plugin.
+MySQL 8.4 LTS comes from Ubuntu's own archive, since 26.04 ships it natively. It's supported through 2032. Ubuntu's package leaves root on `auth_socket`, so the script switches root to `caching_sha2_password` with a generated password.
 
 ## Tuning decisions
 
@@ -105,11 +93,11 @@ Switch to your administrative user, clone the dotfiles repo, and run the script.
 - A swap file sized to 2GB by default
 - Node.js 24 LTS via NodeSource
 - Nginx with a catch-all default server (rejects unknown Host/SNI)
-- PHP 8.4 with FPM and the standard Laravel extension set (ondrej/php PPA on 22.04/24.04, packages.sury.org on 26.04)
-- MySQL 8.4 LTS, non-interactive install (Oracle's official repository on 22.04/24.04, Ubuntu's package on 26.04)
+- PHP 8.4 with FPM and the standard Laravel extension set, from packages.sury.org
+- MySQL 8.4 LTS from Ubuntu's archive, non-interactive install
 - Redis
 - Supervisor
-- Composer
+- Composer, which later `bin/dotfiles` runs keep current with `composer self-update`
 
 The script also applies a small set of opinionated tuning defaults; see the "Tuning decisions" section below for the what and the why.
 
@@ -128,7 +116,6 @@ A few settings can be overridden with environment variables when you run the scr
 - `SWAP_SIZE_GB` (default 2) sets the swap file size in `setup.sh`.
 - `NODE_MAJOR` (default 24) picks the Node.js LTS line in `setup.sh`.
 - `PHP_VERSION` (default 8.4) picks the PHP line in `provision-laravel-app-server.sh` and `provision-dascentral.sh`.
-- `MYSQL_APT_CONFIG_VERSION` (default 0.8.34-1) pins Oracle's `mysql-apt-config` package on 22.04 and 24.04. If the `repo.mysql.com` download fails, check [dev.mysql.com/downloads/repo/apt](https://dev.mysql.com/downloads/repo/apt/) for the current version.
 - `MYSQL_ROOT_PASSWORD` (generated if unset) sets the MySQL root password.
 - `APP_USER` (default `forge`) names the application user in `provision-dascentral.sh`.
 
@@ -245,10 +232,24 @@ node --version                           # v24.x
 free -h                                  # confirm swap is allocated
 ```
 
+## Maintaining existing servers
+
+Only new 26.04 servers are provisioned from scratch. Existing 22.04 and 24.04 servers are maintained in place with two commands.
+
+**`bin/dotfiles`** pulls this repo and re-runs `setup.sh`, which works on any Ubuntu release. Each run applies package upgrades, moves Node.js to `NODE_MAJOR` when it changes, and runs `composer self-update`.
+
+**`install_php <version>`** adds a newer PHP to a server on 22.04, 24.04, or 26.04. It uses the ondrej/php PPA on 22.04 and 24.04 and packages.sury.org on 26.04, installs the standard extension set and the tuning described above, and starts the new FPM alongside the current one. The new pool copies the current pool's `user`, `group`, `listen.owner`, `listen.group`, and `env[HOME]`. The `php` CLI stays on the current version, and nothing is switched over: the script prints the cutover steps (Nginx socket, `update-alternatives`, deploy reload and sudoers, queue workers, disabling the old FPM). Until the Nginx socket changes, the old version keeps serving, so the install is safe to run on a live server. From PHP 8.5 the script skips the `opcache` package, since OPcache is compiled into core.
+
+Ondřej has announced that 22.04 and 24.04 users will be moved from the Launchpad PPA to packages.sury.org. When that happens, `install_php` needs to follow.
+
+**MySQL on older servers.** Check `mysql --version`. A server still on Ubuntu's MySQL 8.0 is past end of life (April 21, 2026). Moving to 8.4 LTS from [Oracle's APT repository](https://dev.mysql.com/downloads/repo/apt/) is an in-place upgrade that can't be rolled back, so take a full backup first.
+
+**Ubuntu 22.04 reaches end of standard support in April 2027.** Reaching 26.04 in place takes two release upgrades, so replacing a 22.04 server with a freshly provisioned 26.04 droplet is usually less work.
+
 ## Resources
 
 - DigitalOcean: [Initial Server Setup with Ubuntu 24.04](https://www.digitalocean.com/community/tutorials/initial-server-setup-with-ubuntu-24-04)
 - DigitalOcean: [How To Install Linux, Nginx, MySQL, PHP (LEMP) on Ubuntu 24.04](https://www.digitalocean.com/community/tutorials/how-to-install-linux-nginx-mysql-php-lemp-stack-on-ubuntu-24-04)
-- Ondřej Surý PHP PPA (22.04/24.04): [launchpad.net/~ondrej/+archive/ubuntu/php](https://launchpad.net/~ondrej/+archive/ubuntu/php)
+- Ondřej Surý PHP PPA (22.04/24.04, used by `install_php`): [launchpad.net/~ondrej/+archive/ubuntu/php](https://launchpad.net/~ondrej/+archive/ubuntu/php)
 - Ondřej Surý PHP repo (26.04): [packages.sury.org/php](https://packages.sury.org/php/)
-- MySQL 8.4 LTS APT repo (22.04/24.04): [dev.mysql.com/downloads/repo/apt](https://dev.mysql.com/downloads/repo/apt/)
+- Oracle MySQL APT repo (upgrading older servers): [dev.mysql.com/downloads/repo/apt](https://dev.mysql.com/downloads/repo/apt/)

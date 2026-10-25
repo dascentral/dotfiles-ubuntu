@@ -2,10 +2,10 @@
 #
 # provision-laravel-app-server.sh
 #
-# Provision an Ubuntu 22.04, 24.04, or 26.04 LTS server for Laravel hosting:
+# Provision an Ubuntu 26.04 LTS server for Laravel hosting:
 # - Nginx
-# - PHP 8.4-FPM
-# - MySQL 8.4 LTS (Oracle on 22.04/24.04, Ubuntu on 26.04)
+# - PHP 8.4-FPM (via bin/install_php)
+# - MySQL 8.4 LTS
 # - Redis
 # - Supervisor
 # - Composer
@@ -20,7 +20,6 @@
 #
 # Optional environment variables:
 #   PHP_VERSION              defaults to 8.4
-#   MYSQL_APT_CONFIG_VERSION defaults to 0.8.34-1 (22.04/24.04 only)
 #   MYSQL_ROOT_PASSWORD      auto-generated if unset
 #
 
@@ -31,7 +30,6 @@ source "${HOME}/.dotfiles/lib/config.sh"
 # --- Configuration -----------------------------------------------------------
 
 PHP_VERSION="${PHP_VERSION:-8.4}"
-MYSQL_APT_CONFIG_VERSION="${MYSQL_APT_CONFIG_VERSION:-0.8.34-1}"
 
 LARAVEL_DIR="${DOTFILES}/provision/laravel"
 LOG_FILE="$LOG_PROVISION_LARAVEL"
@@ -53,7 +51,7 @@ if ! sudo -n true 2>/dev/null; then
   sudo -v
 fi
 
-require_ubuntu 22.04 24.04 26.04
+require_ubuntu 26.04
 
 if [[ ! -f "$LOG_SETUP_COMPLETE" ]]; then
   die "setup.sh has not been run successfully. Run provision/setup.sh first."
@@ -75,7 +73,7 @@ ok "System packages up to date"
 source "${LARAVEL_DIR}/nginx.sh"
 source "${LARAVEL_DIR}/redis.sh"
 source "${LARAVEL_DIR}/supervisor.sh"
-source "${LARAVEL_DIR}/php.sh"
+"${DOTFILES}/bin/install_php" "$PHP_VERSION"
 source "${LARAVEL_DIR}/mysql.sh"
 source "${LARAVEL_DIR}/composer.sh"
 

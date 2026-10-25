@@ -53,6 +53,7 @@ source "${SETUP_DIR}/utilities.sh"
 source "${SETUP_DIR}/system-defaults.sh"
 source "${SETUP_DIR}/security.sh"
 source "${SETUP_DIR}/nodejs.sh"
+source "${SETUP_DIR}/composer.sh"
 source "${SETUP_DIR}/shell.sh"
 
 # --- Done ---------------------------------------------------------------------

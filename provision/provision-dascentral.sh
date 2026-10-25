@@ -2,7 +2,7 @@
 #
 # provision-dascentral.sh
 #
-# Provision dascentral.com application dependencies on Ubuntu 22.04, 24.04, or 26.04 LTS:
+# Provision dascentral.com application dependencies on Ubuntu 26.04 LTS:
 # - Headless Chromium (via Puppeteer)
 # - qpdf
 # - Ghostscript
@@ -44,7 +44,7 @@ if ! sudo -n true 2>/dev/null; then
   sudo -v
 fi
 
-require_ubuntu 22.04 24.04 26.04
+require_ubuntu 26.04
 
 if [[ ! -f "$LOG_PROVISION_LARAVEL" ]]; then
   die "provision-laravel-app-server.sh has not been run. Run it first."
@@ -67,13 +67,10 @@ ok "Package index refreshed"
 # --- Headless Chromium system dependencies -----------------------------------
 
 section "Headless Chromium system dependencies"
-# 24.04's 64-bit time_t transition renamed libasound2. The other renamed libs
-# keep their old names as virtual packages, but libasound2 has multiple providers.
-if ubuntu_version_lt 24.04; then LIBASOUND=libasound2; else LIBASOUND=libasound2t64; fi
 sudo apt-get install -y -qq \
   ca-certificates \
   fonts-liberation \
-  "$LIBASOUND" \
+  libasound2t64 \
   libatk-bridge2.0-0 \
   libatk1.0-0 \
   libcairo2 \

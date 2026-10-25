@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+#
+# install_php
+#
+# Install a PHP-FPM version with the standard Laravel extension set and the
+# provisioned OPcache/realpath tuning. Used by provision-laravel-app-server.sh
+# on new servers and run directly to add a newer PHP to an existing one.
+#
+# On a server that already has PHP, the new version installs alongside it:
+# its FPM pool copies the current pool's user, group, listen owner, and
+# env[HOME], the `php` CLI stays on the current version, and nothing is
+# switched over. The cutover steps are printed at the end.
+#
+# Supports Ubuntu 22.04, 24.04, and 26.04.
+#
+# Usage: install_php 8.5
+#
+
+set -euo pipefail
+
+source "${HOME}/.dotfiles/lib/config.sh"
+
+PHP_VERSION="${1:-}"
+
+if [[ ! "$PHP_VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then
+  usage "Usage: install_php <version>   e.g. install_php 8.5"
+fi
+
+require_ubuntu 22.04 24.04 26.04
+
+CURRENT_PHP=""
+if command -v php >/dev/null 2>&1; then
+  CURRENT_PHP="$(php -r 'echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION;')"
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+
+# --- Package repository ------------------------------------------------------
+
+if ubuntu_version_lt 26.04; then
+  section "ondrej/php PPA"
+  if ! grep -rq 'ondrej/php' /etc/apt/sources.list.d/ 2>/dev/null; then
+    sudo add-apt-repository -y ppa:ondrej/php
+    sudo apt-get update -qq
+  fi
+  ok "ondrej/php PPA configured"
+else
+  # The Launchpad PPA does not publish for 26.04; packages.sury.org is the
+  # same maintainer's canonical repo there.
+  section "packages.sury.org PHP repository"
+  if ! grep -rq 'packages.sury.org/php' /etc/apt/sources.list.d/ 2>/dev/null; then
+    curl -fsSL https://packages.sury.org/debsuryorg-archive-keyring.deb -o /tmp/debsuryorg-archive-keyring.deb
+    sudo dpkg -i /tmp/debsuryorg-archive-keyring.deb >/dev/null
+    rm -f /tmp/debsuryorg-archive-keyring.deb
+    echo "deb [signed-by=/usr/share/keyrings/debsuryorg-archive-keyring.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" \
+      | sudo tee /etc/apt/sources.list.d/php.list >/dev/null
+    sudo apt-get update -qq
+  fi
+  ok "packages.sury.org configured"
+fi
+
+if ! apt-cache show "php${PHP_VERSION}-fpm" >/dev/null 2>&1; then
+  die "php${PHP_VERSION}-fpm is not available on Ubuntu $(ubuntu_version)."
+fi
+
+# --- Install -----------------------------------------------------------------
+
+section "PHP ${PHP_VERSION}"
+PHP_EXTENSIONS=(fpm cli common bcmath curl gd intl ldap mbstring mysql readline redis xml zip)
+# OPcache is compiled into core from PHP 8.5 and no longer ships as a package.
+if dpkg --compare-versions "$PHP_VERSION" lt 8.5; then
+  PHP_EXTENSIONS+=(opcache)
+fi
+sudo apt-get install -y -qq "php${PHP_VERSION}" "${PHP_EXTENSIONS[@]/#/php${PHP_VERSION}-}"
+
+if [[ -n "$CURRENT_PHP" && "$CURRENT_PHP" != "$PHP_VERSION" ]]; then
+  # update-alternatives moves `php` to the newest version on install; keep
+  # Horizon, cron, and Composer on the current one until cutover.
+  sudo update-alternatives --quiet --set php "/usr/bin/php${CURRENT_PHP}"
+  ok "PHP ${PHP_VERSION} installed; php CLI stays on ${CURRENT_PHP}"
+else
+  ok "PHP ${PHP_VERSION} installed"
+fi
+
+section "PHP tuning (OPcache, realpath_cache)"
+TUNING_INI=$(cat <<'EOF'
+; Provisioned tuning
+opcache.memory_consumption=256
+opcache.interned_strings_buffer=16
+opcache.max_accelerated_files=20000
+opcache.validate_timestamps=0
+realpath_cache_size=4096K
+realpath_cache_ttl=600
+EOF
+)
+for sapi in fpm cli; do
+  echo "$TUNING_INI" | sudo tee "/etc/php/${PHP_VERSION}/${sapi}/conf.d/99-tuning.ini" >/dev/null
+done
+ok "OPcache: 256MB / 20k files / no timestamp validation; realpath_cache: 4MB / 600s"
+
+# --- FPM pool ----------------------------------------------------------------
+
+if [[ -n "$CURRENT_PHP" && "$CURRENT_PHP" != "$PHP_VERSION" ]]; then
+  section "PHP-FPM pool settings from ${CURRENT_PHP}"
+  OLD_POOL="/etc/php/${CURRENT_PHP}/fpm/pool.d/www.conf"
+  NEW_POOL="/etc/php/${PHP_VERSION}/fpm/pool.d/www.conf"
+  if [[ -f "$OLD_POOL" ]]; then
+    for key in user group listen.owner listen.group; do
+      value="$(awk -F' *= *' -v k="$key" '$1 == k { v = $2 } END { print v }' "$OLD_POOL")"
+      if [[ -n "$value" ]]; then
+        sudo sed -i "s|^${key//./\\.} = .*|${key} = ${value}|" "$NEW_POOL"
+      fi
+    done
+    home_line="$(grep -E '^\s*env\[HOME\]\s*=' "$OLD_POOL" || true)"
+    if [[ -n "$home_line" ]] && ! grep -qE '^\s*env\[HOME\]\s*=' "$NEW_POOL"; then
+      printf '\n%s\n' "$home_line" | sudo tee -a "$NEW_POOL" >/dev/null
+    fi
+    ok "Copied user, group, listen owner, and env[HOME] from ${OLD_POOL}"
+  else
+    warn "No ${OLD_POOL}; set the ${PHP_VERSION} pool user manually"
+  fi
+fi
+
+sudo systemctl enable --now "php${PHP_VERSION}-fpm" >/dev/null
+sudo systemctl restart "php${PHP_VERSION}-fpm"
+ok "php${PHP_VERSION}-fpm running"
+
+# --- Cutover -----------------------------------------------------------------
+
+if [[ -n "$CURRENT_PHP" && "$CURRENT_PHP" != "$PHP_VERSION" ]]; then
+  section "PHP ${PHP_VERSION} is installed alongside ${CURRENT_PHP}"
+  cat <<EOF
+
+Nothing has been switched over. To move this server to ${PHP_VERSION}:
+
+  1. Point each app's Nginx server block (in its deploy/nginx folder) at
+       fastcgi_pass unix:/run/php/php${PHP_VERSION}-fpm.sock;
+     then deploy and run: sudo nginx -t && sudo systemctl reload nginx
+
+  2. Switch the php CLI (Horizon, cron, Composer):
+       sudo update-alternatives --set php /usr/bin/php${PHP_VERSION}
+
+  3. Update php${CURRENT_PHP}-fpm to php${PHP_VERSION}-fpm in the deploy pipeline's
+     reload command and in /etc/sudoers.d.
+
+  4. Restart queue workers:
+       sudo supervisorctl restart all
+
+  5. Once traffic is on ${PHP_VERSION}, stop the old FPM:
+       sudo systemctl disable --now php${CURRENT_PHP}-fpm
+
+EOF
+fi
