@@ -67,7 +67,7 @@ ok "Package index refreshed"
 # --- Headless Chromium system dependencies -----------------------------------
 
 section "Headless Chromium system dependencies"
-sudo apt-get install -y -qq \
+sudo apt-get install -y -qq --no-upgrade \
   ca-certificates \
   fonts-liberation \
   libasound2t64 \
@@ -103,19 +103,19 @@ ok "Chrome browser up to date at ${APP_USER_HOME}/.cache/puppeteer/"
 # --- qpdf --------------------------------------------------------------------
 
 section "qpdf"
-sudo apt-get install -y -qq qpdf
+sudo apt-get install -y -qq --no-upgrade qpdf
 ok "qpdf $(qpdf --version 2>&1 | head -n1)"
 
 # --- Ghostscript -------------------------------------------------------------
 
 section "Ghostscript"
-sudo apt-get install -y -qq ghostscript
+sudo apt-get install -y -qq --no-upgrade ghostscript
 ok "Ghostscript $(/usr/bin/gs --version)"
 
 # --- LibreOffice -------------------------------------------------------------
 
 section "LibreOffice"
-sudo apt-get install -y -qq --no-install-recommends libreoffice
+sudo apt-get install -y -qq --no-upgrade --no-install-recommends libreoffice
 ok "LibreOffice $(/usr/bin/soffice --version 2>&1 | head -n1)"
 
 section "LibreOffice configuration for ${APP_USER}"

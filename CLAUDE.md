@@ -4,9 +4,10 @@ Personal dotfiles and infrastructure-as-text for Ubuntu servers running Laravel 
 
 ## Layout
 
-- `provision/setup.sh`: idempotent system customization entrypoint (sources modular scripts from `provision/setup/`). Invoked day-to-day via `bin/dotfiles`.
-- `provision/setup/`: modular setup scripts: `system-update.sh`, `utilities.sh`, `system-defaults.sh`, `security.sh`, `nodejs.sh`, `composer.sh`, `shell.sh`.
-- `provision/provision-laravel-app-server.sh`: one-shot Laravel app server provisioning (Nginx, PHP, MySQL, Redis, Supervisor, Composer). Sources modular scripts from `provision/laravel/`. See `provision/CLAUDE.md`.
+- `provision/setup.sh`: idempotent system customization entrypoint (sources modules from `provision/system/` and `provision/software/`). Invoked day-to-day via `bin/dotfiles`.
+- `provision/system/`: base system modules: `update.sh`, `utilities.sh`, `defaults.sh`, `security.sh`, `shell.sh`.
+- `provision/software/`: one module per piece of software: `composer.sh`, `mysql.sh`, `nginx.sh`, `nodejs.sh`, `redis.sh`, `supervisor.sh`. Entry scripts choose which to source.
+- `provision/provision-laravel-app-server.sh`: one-shot Laravel app server provisioning (Nginx, PHP, MySQL, Redis, Supervisor, Composer). Sources modules from `provision/software/` and runs `bin/install_php`. See `provision/CLAUDE.md`.
 - `provision/provision-dascentral.sh`: dascentral.com app dependencies, run after the Laravel script.
 - `lib/`: shared shell library: `config.sh` (loader), `colors.sh`, `functions.sh`.
 - `bin/`: user-facing commands on `PATH` (`dotfiles`, `a`, `install_php`, `validate_redis_security`, etc.).
@@ -15,8 +16,8 @@ Personal dotfiles and infrastructure-as-text for Ubuntu servers running Laravel 
 
 ## Script Conventions
 
-- **Source shared helpers first:** `source "${HOME}/.dotfiles/lib/config.sh"` brings in color codes, `section`, `ok`, `abort`, `info`, `warn`, `die`, and other helpers. All `bin/` scripts and `provision/` scripts use this. `lib/functions.sh` also provides `ubuntu_version`, `ubuntu_version_lt`, and `require_ubuntu` for release-specific branches.
-- **Idempotency:** each setup module is safe to re-run. Read the surrounding code before adding a new step.
+- **Source shared helpers first:** `source "${HOME}/.dotfiles/lib/config.sh"` brings in color codes, `section`, `ok`, `abort`, `info`, `warn`, `die`, and other helpers. All `bin/` scripts and `provision/` scripts use this. `lib/functions.sh` also provides `write_if_changed`, plus `ubuntu_version`, `ubuntu_version_lt`, and `require_ubuntu` for release-specific branches.
+- **Safe to re-run on a live server:** write managed config files with `write_if_changed` and restart or reload a service only when it reports a change. Install packages with `--no-upgrade`; upgrades happen only in `system/update.sh`. Read the surrounding code before adding a new step.
 - **Tuning files use a `99-*` prefix** under `conf.d/` directories so they sort last and survive package updates.
 
 ## Style

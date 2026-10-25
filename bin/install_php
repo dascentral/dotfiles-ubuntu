@@ -71,7 +71,7 @@ PHP_EXTENSIONS=(fpm cli common bcmath curl gd intl ldap mbstring mysql readline 
 if dpkg --compare-versions "$PHP_VERSION" lt 8.5; then
   PHP_EXTENSIONS+=(opcache)
 fi
-sudo apt-get install -y -qq "php${PHP_VERSION}" "${PHP_EXTENSIONS[@]/#/php${PHP_VERSION}-}"
+sudo apt-get install -y -qq --no-upgrade "php${PHP_VERSION}" "${PHP_EXTENSIONS[@]/#/php${PHP_VERSION}-}"
 
 if [[ -n "$CURRENT_PHP" && "$CURRENT_PHP" != "$PHP_VERSION" ]]; then
   # update-alternatives moves `php` to the newest version on install; keep
@@ -83,7 +83,9 @@ else
 fi
 
 section "PHP tuning (OPcache, realpath_cache)"
-TUNING_INI=$(cat <<'EOF'
+FPM_CHANGED=false
+for sapi in fpm cli; do
+  if write_if_changed "/etc/php/${PHP_VERSION}/${sapi}/conf.d/99-tuning.ini" <<'EOF'
 ; Provisioned tuning
 opcache.memory_consumption=256
 opcache.interned_strings_buffer=16
@@ -92,9 +94,9 @@ opcache.validate_timestamps=0
 realpath_cache_size=4096K
 realpath_cache_ttl=600
 EOF
-)
-for sapi in fpm cli; do
-  echo "$TUNING_INI" | sudo tee "/etc/php/${PHP_VERSION}/${sapi}/conf.d/99-tuning.ini" >/dev/null
+  then
+    if [[ "$sapi" == fpm ]]; then FPM_CHANGED=true; fi
+  fi
 done
 ok "OPcache: 256MB / 20k files / no timestamp validation; realpath_cache: 4MB / 600s"
 
@@ -105,25 +107,35 @@ if [[ -n "$CURRENT_PHP" && "$CURRENT_PHP" != "$PHP_VERSION" ]]; then
   OLD_POOL="/etc/php/${CURRENT_PHP}/fpm/pool.d/www.conf"
   NEW_POOL="/etc/php/${PHP_VERSION}/fpm/pool.d/www.conf"
   if [[ -f "$OLD_POOL" ]]; then
+    pool="$(cat "$NEW_POOL")"
     for key in user group listen.owner listen.group; do
       value="$(awk -F' *= *' -v k="$key" '$1 == k { v = $2 } END { print v }' "$OLD_POOL")"
       if [[ -n "$value" ]]; then
-        sudo sed -i "s|^${key//./\\.} = .*|${key} = ${value}|" "$NEW_POOL"
+        pool="$(sed "s|^${key//./\\.} = .*|${key} = ${value}|" <<<"$pool")"
       fi
     done
     home_line="$(grep -E '^\s*env\[HOME\]\s*=' "$OLD_POOL" || true)"
-    if [[ -n "$home_line" ]] && ! grep -qE '^\s*env\[HOME\]\s*=' "$NEW_POOL"; then
-      printf '\n%s\n' "$home_line" | sudo tee -a "$NEW_POOL" >/dev/null
+    if [[ -n "$home_line" ]] && ! grep -qE '^\s*env\[HOME\]\s*=' <<<"$pool"; then
+      pool="$(printf '%s\n\n%s' "$pool" "$home_line")"
     fi
-    ok "Copied user, group, listen owner, and env[HOME] from ${OLD_POOL}"
+    if write_if_changed "$NEW_POOL" <<<"$pool"; then
+      FPM_CHANGED=true
+      ok "Copied user, group, listen owner, and env[HOME] from ${OLD_POOL}"
+    else
+      ok "Pool settings already match ${OLD_POOL}"
+    fi
   else
     warn "No ${OLD_POOL}; set the ${PHP_VERSION} pool user manually"
   fi
 fi
 
 sudo systemctl enable --now "php${PHP_VERSION}-fpm" >/dev/null
-sudo systemctl restart "php${PHP_VERSION}-fpm"
-ok "php${PHP_VERSION}-fpm running"
+if [[ "$FPM_CHANGED" == true ]]; then
+  sudo systemctl restart "php${PHP_VERSION}-fpm"
+  ok "php${PHP_VERSION}-fpm restarted with new configuration"
+else
+  ok "php${PHP_VERSION}-fpm running; configuration unchanged"
+fi
 
 # --- Cutover -----------------------------------------------------------------
 

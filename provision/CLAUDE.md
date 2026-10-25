@@ -1,6 +1,6 @@
 # Provisioning
 
-`setup.sh` prepares any Ubuntu server and is re-run day-to-day via `bin/dotfiles`, including on the existing 22.04 and 24.04 servers. `provision-laravel-app-server.sh` runs once after it on a new 26.04 server, and `provision-dascentral.sh` runs once after that. `bin/install_php` installs PHP for the Laravel script and is also run directly to add a newer PHP to existing servers. `provision/README.md` is the human-facing guide and documents every tuning value, overridable setting, and maintenance command.
+`setup.sh` prepares any Ubuntu server and is re-run day-to-day via `bin/dotfiles`, including on the existing 22.04 and 24.04 servers. `provision-laravel-app-server.sh` runs after it on a new 26.04 server, and `provision-dascentral.sh` runs after that. Modules live in `system/` (base system) and `software/` (one per piece of software); the entry scripts decide which to source, so a module can be shared, like `software/composer.sh`. `bin/install_php` installs PHP for the Laravel script and is also run directly to add a newer PHP to existing servers. `provision/README.md` is the human-facing guide and documents every tuning value, overridable setting, and maintenance command.
 
 ## Hard Constraints
 
@@ -9,7 +9,8 @@ These are load-bearing. Do not remove without an explicit conversation.
 - **`setup.sh` targets Ubuntu (any version).** The OS guard checks for Ubuntu generically.
 - **Only new 26.04 servers are provisioned.** `provision-laravel-app-server.sh` and `provision-dascentral.sh` guard on `require_ubuntu 26.04`. Don't add branches for older releases there.
 - **`bin/install_php` supports 22.04, 24.04, and 26.04** because it maintains existing servers. It installs alongside the current PHP and never switches over: no Nginx socket changes, and the `php` CLI stays pinned to the current version.
-- **All scripts are idempotent and run as a non-root sudo user.**
+- **Every script and module is safe to re-run on a live server.** A second run on an unchanged server changes nothing and restarts nothing. Managed config files go through `write_if_changed`, and services restart or reload only when it reports a change. Installs use `--no-upgrade`; upgrades happen only in `system/update.sh` (and `software/nodejs.sh` when `NODE_MAJOR` changes). Re-running reverts hand edits to managed files, so tune through the scripts.
+- **All scripts run as a non-root sudo user.**
 - **Each script gates on the one before it.** `provision-laravel-app-server.sh` requires `~/logs/setup-complete.log`, and `provision-dascentral.sh` requires the Laravel log.
 - **All scripts source `lib/config.sh`** for shared helpers and log paths. Logs and completion markers live under `~/logs`; each run replaces its previous log.
 - **PHP-FPM, Horizon, and app files all run as the admin user (not www-data).** Deliberate choice to avoid permission issues. Don't revert the pool config.

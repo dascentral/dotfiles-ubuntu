@@ -16,7 +16,8 @@ set -euo pipefail
 
 source "${HOME}/.dotfiles/lib/config.sh"
 
-SETUP_DIR="${DOTFILES}/provision/setup"
+SYSTEM_DIR="${DOTFILES}/provision/system"
+SOFTWARE_DIR="${DOTFILES}/provision/software"
 LOG_FILE="$LOG_SETUP"
 
 mkdir -p "$LOG_DIR"
@@ -48,13 +49,13 @@ export DEBIAN_FRONTEND=noninteractive
 
 # --- Run modules --------------------------------------------------------------
 
-source "${SETUP_DIR}/system-update.sh"
-source "${SETUP_DIR}/utilities.sh"
-source "${SETUP_DIR}/system-defaults.sh"
-source "${SETUP_DIR}/security.sh"
-source "${SETUP_DIR}/nodejs.sh"
-source "${SETUP_DIR}/composer.sh"
-source "${SETUP_DIR}/shell.sh"
+source "${SYSTEM_DIR}/update.sh"
+source "${SYSTEM_DIR}/utilities.sh"
+source "${SYSTEM_DIR}/defaults.sh"
+source "${SYSTEM_DIR}/security.sh"
+source "${SOFTWARE_DIR}/nodejs.sh"
+source "${SOFTWARE_DIR}/composer.sh"
+source "${SYSTEM_DIR}/shell.sh"
 
 # --- Done ---------------------------------------------------------------------
 

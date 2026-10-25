@@ -30,7 +30,7 @@ The script applies a small set of opinionated defaults rather than leaving every
 
 **`realpath_cache_size=4M`, `ttl=600`.** Laravel does a lot of filesystem work during bootstrap (autoloading, view resolution, config loading). Stock `realpath_cache_size` is 256K, which Laravel exhausts immediately. This is one of those changes where the difference is small per request but consistent across every request.
 
-**`innodb_buffer_pool_size` sized to detected RAM.** The MySQL default of 128MB is fine for a tutorial and painful for anything that joins. The script picks 256MB on a 1GB host, 512MB on 2GB, ~35% of RAM on 4GB, and ~40% on 8GB+. The percentages are below the conventional 50% recommendation because this is a shared application server, not a dedicated database host; FPM workers, Redis, Horizon, and the Vite-built asset serving all need their share too.
+**`innodb_buffer_pool_size` sized to detected RAM.** The MySQL default of 128MB is fine for a tutorial and painful for anything that joins. The script picks 256MB on a 1GB host, 512MB on 2GB, ~35% of RAM on 4GB, and ~40% on 8GB+, rounded down to a multiple of 128MB (InnoDB allocates the pool in 128MB chunks anyway, and rounding keeps small RAM-reporting changes after kernel updates from triggering a MySQL restart). The percentages are below the conventional 50% recommendation because this is a shared application server, not a dedicated database host; FPM workers, Redis, Horizon, and the Vite-built asset serving all need their share too.
 
 **What's deliberately not tuned.** Redis `maxmemory` is left at default because you'd want to separate cache and queue databases before applying an eviction policy, and that's an application decision rather than a server one. MySQL slow query log is observability tooling that belongs in a follow-up tuning pass. PHP-FPM `pm` settings (`pm.max_children`, etc.) are left at distro defaults because the right values depend on how big your application's per-process footprint actually is, which is easier to measure than to guess.
 
@@ -119,7 +119,7 @@ A few settings can be overridden with environment variables when you run the scr
 - `MYSQL_ROOT_PASSWORD` (generated if unset) sets the MySQL root password.
 - `APP_USER` (default `forge`) names the application user in `provision-dascentral.sh`.
 
-The script is idempotent for the most part. If it fails partway through, fix the cause and re-run; it will skip over what's already in place.
+Every script is safe to re-run, including on a live server. A re-run only changes what differs from the scripts, restarts a service only when its config file changed, and never upgrades packages (`bin/dotfiles` handles upgrades). If a run fails partway through, fix the cause and run it again. Re-running also puts managed files such as `99-tuning.cnf` back to what the scripts say, so make tuning changes in the scripts rather than by hand.
 
 A randomly generated MySQL root password is written to `~/.mysql_root_password` (mode 0600). Read it and store it in 1Password before doing anything else. The script logs its full output to `~/logs/provision-laravel.log`, replacing the previous run's log.
 

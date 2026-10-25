@@ -31,7 +31,7 @@ source "${HOME}/.dotfiles/lib/config.sh"
 
 PHP_VERSION="${PHP_VERSION:-8.4}"
 
-LARAVEL_DIR="${DOTFILES}/provision/laravel"
+SOFTWARE_DIR="${DOTFILES}/provision/software"
 LOG_FILE="$LOG_PROVISION_LARAVEL"
 MYSQL_PASS_FILE="$HOME/.mysql_root_password"
 
@@ -61,21 +61,22 @@ ok "Running as $(whoami) on $(lsb_release -ds)"
 
 export DEBIAN_FRONTEND=noninteractive
 
-# --- System update -----------------------------------------------------------
+# --- Package index -----------------------------------------------------------
 
-section "System update"
+# Upgrades belong to setup.sh; modules here install with --no-upgrade so a
+# re-run on a live server doesn't upgrade (and restart) anything.
+section "Package index"
 sudo apt-get update -qq
-sudo apt-get upgrade -y -qq
-ok "System packages up to date"
+ok "Package index refreshed"
 
 # --- Run modules --------------------------------------------------------------
 
-source "${LARAVEL_DIR}/nginx.sh"
-source "${LARAVEL_DIR}/redis.sh"
-source "${LARAVEL_DIR}/supervisor.sh"
+source "${SOFTWARE_DIR}/nginx.sh"
+source "${SOFTWARE_DIR}/redis.sh"
+source "${SOFTWARE_DIR}/supervisor.sh"
 "${DOTFILES}/bin/install_php" "$PHP_VERSION"
-source "${LARAVEL_DIR}/mysql.sh"
-source "${LARAVEL_DIR}/composer.sh"
+source "${SOFTWARE_DIR}/mysql.sh"
+source "${SOFTWARE_DIR}/composer.sh"
 
 # --- Done --------------------------------------------------------------------
 

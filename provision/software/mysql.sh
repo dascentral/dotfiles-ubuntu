@@ -12,7 +12,7 @@ else
     MYSQL_ROOT_PASSWORD="$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-28)"
   fi
 
-  sudo -E apt-get install -y -qq mysql-server
+  sudo -E apt-get install -y -qq --no-upgrade mysql-server
 
   # Ubuntu's package leaves root on auth_socket; switch it to the generated password.
   SQL_PASSWORD="${MYSQL_ROOT_PASSWORD//\\/\\\\}"
@@ -32,15 +32,21 @@ fi
 
 section "MySQL tuning"
 TOTAL_MEM_MB=$(awk '/MemTotal/ {printf "%d", $2/1024}' /proc/meminfo)
-if   (( TOTAL_MEM_MB >= 7168 )); then BUFFER_POOL_MB=$((TOTAL_MEM_MB * 40 / 100))
-elif (( TOTAL_MEM_MB >= 3584 )); then BUFFER_POOL_MB=$((TOTAL_MEM_MB * 35 / 100))
+# Percentages round down to 128MB (InnoDB's chunk size) so small MemTotal
+# shifts after kernel updates don't rewrite the file and restart MySQL.
+if   (( TOTAL_MEM_MB >= 7168 )); then BUFFER_POOL_MB=$((TOTAL_MEM_MB * 40 / 100 / 128 * 128))
+elif (( TOTAL_MEM_MB >= 3584 )); then BUFFER_POOL_MB=$((TOTAL_MEM_MB * 35 / 100 / 128 * 128))
 elif (( TOTAL_MEM_MB >= 1792 )); then BUFFER_POOL_MB=512
 else                                   BUFFER_POOL_MB=256
 fi
-sudo tee /etc/mysql/conf.d/99-tuning.cnf >/dev/null <<EOF
-# Provisioned tuning. Detected ${TOTAL_MEM_MB}MB total RAM.
+if write_if_changed /etc/mysql/conf.d/99-tuning.cnf <<EOF
+# Provisioned tuning, sized to host RAM.
 [mysqld]
 innodb_buffer_pool_size = ${BUFFER_POOL_MB}M
 EOF
-sudo systemctl restart mysql
-ok "innodb_buffer_pool_size set to ${BUFFER_POOL_MB}M (host has ${TOTAL_MEM_MB}MB RAM)"
+then
+  sudo systemctl restart mysql
+  ok "innodb_buffer_pool_size set to ${BUFFER_POOL_MB}M (host has ${TOTAL_MEM_MB}MB RAM); MySQL restarted"
+else
+  ok "innodb_buffer_pool_size already ${BUFFER_POOL_MB}M"
+fi

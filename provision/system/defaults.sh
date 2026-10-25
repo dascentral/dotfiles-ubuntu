@@ -8,13 +8,14 @@ section "System defaults"
 sudo timedatectl set-timezone UTC
 ok "Timezone set to UTC"
 
-sudo mkdir -p /etc/systemd/journald.conf.d
-sudo tee /etc/systemd/journald.conf.d/99-cap.conf >/dev/null <<'EOF'
+if write_if_changed /etc/systemd/journald.conf.d/99-cap.conf <<'EOF'
 [Journal]
 SystemMaxUse=500M
 SystemKeepFree=1G
 EOF
-sudo systemctl restart systemd-journald
+then
+  sudo systemctl restart systemd-journald
+fi
 ok "journald capped at 500MB"
 
 section "Swap file (${SWAP_SIZE_GB}GB)"
