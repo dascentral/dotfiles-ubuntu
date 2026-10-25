@@ -236,7 +236,9 @@ free -h                                  # confirm swap is allocated
 
 Only new 26.04 servers are provisioned from scratch. Existing 22.04 and 24.04 servers are maintained in place with two commands.
 
-**`bin/dotfiles`** pulls this repo and re-runs `setup.sh`, which works on any Ubuntu release. Each run applies package upgrades, moves Node.js to `NODE_MAJOR` when it changes, and runs `composer self-update`.
+**`bin/dotfiles`** pulls this repo and re-runs `setup.sh`, which works on any Ubuntu release. Each run applies package upgrades, moves Node.js to `NODE_MAJOR` when it changes, and runs `composer self-update`. Upgrades include patch releases for PHP, MySQL, Nginx, Redis, Supervisor, and Node.js, and a service restarts when its package is upgraded.
+
+Unattended upgrades only apply security updates from Ubuntu's own archive. PHP (packages.sury.org or the ondrej/php PPA) and Node.js (NodeSource) come from third-party repositories, so their security patches arrive only when you run `bin/dotfiles`. Run it regularly, and promptly after a PHP security release.
 
 **`install_php <version>`** adds a newer PHP to a server on 22.04, 24.04, or 26.04. It uses the ondrej/php PPA on 22.04 and 24.04 and packages.sury.org on 26.04, installs the standard extension set and the tuning described above, and starts the new FPM alongside the current one. The new pool copies the current pool's `user`, `group`, `listen.owner`, `listen.group`, and `env[HOME]`. The `php` CLI stays on the current version, and nothing is switched over: the script prints the cutover steps (Nginx socket, `update-alternatives`, deploy reload and sudoers, queue workers, disabling the old FPM). Until the Nginx socket changes, the old version keeps serving, so the install is safe to run on a live server. From PHP 8.5 the script skips the `opcache` package, since OPcache is compiled into core.
 
