@@ -1,64 +1,30 @@
 # Provisioning
 
-Two scripts live here:
-
-- `setup.sh` — idempotent system customization for any Ubuntu server. Sources modular scripts from `setup/`. Safe to re-run via `bin/dotfiles`.
-- `provision-laravel-app-server.sh` — one-shot Laravel app server provisioning (Nginx, PHP 8.4-FPM, MySQL 8.4 LTS, Redis, Supervisor, Composer). Sources modular scripts from `laravel/`. Run after `setup.sh`.
+`setup.sh` prepares any Ubuntu server and is re-run day-to-day via `bin/dotfiles`, including on the existing 22.04 and 24.04 servers. `provision-laravel-app-server.sh` runs after it on a new 26.04 server, and `provision-dascentral.sh` runs after that. Modules live in `system/` (base OS), `software/` (one per piece of software), and `shell/` (your zsh environment); the entry scripts decide which to source, so a module can be shared, like `software/composer.sh`. `software/php.sh` installs PHP for the Laravel script and is also run directly to add a newer PHP to existing servers, so unlike the other modules it is executed with a version argument rather than sourced. It only installs; `bin/tune_php` owns the PHP tuning values and is a separate, optional step that the Laravel script applies on new servers. `provision/README.md` is the human-facing guide and documents every tuning value, overridable setting, and maintenance command.
 
 ## Hard Constraints
 
 These are load-bearing. Do not remove without an explicit conversation.
 
 - **`setup.sh` targets Ubuntu (any version).** The OS guard checks for Ubuntu generically.
-- **`provision-laravel-app-server.sh` targets Ubuntu 24.04 LTS only.** The OS guard is intentional. Add a parallel branch for other versions rather than weakening the guard.
-- **Both must remain idempotent.** Every step checks for existing state or relies on apt's idempotence.
-- **Both run as a non-root sudo user, not root.** The pre-flight check enforces this.
-- **`provision-laravel-app-server.sh` gates on `~/logs/setup-complete.log`.** Verifies `setup.sh` has completed successfully.
-- **The provisioning scripts source `lib/config.sh`** for shared `section`/`ok` helpers and log paths. Logs and completion markers live under `~/logs`; each run replaces its previous log.
+- **Only new 26.04 servers are provisioned.** `provision-laravel-app-server.sh` and `provision-dascentral.sh` guard on `require_ubuntu 26.04`. Don't add branches for older releases there.
+- **`software/php.sh` supports 22.04, 24.04, and 26.04** because it maintains existing servers. It installs alongside the current PHP and never switches over: no Nginx socket changes, and the `php` CLI stays pinned to the current version.
+- **Every script and module is safe to re-run on a live server.** A second run on an unchanged server changes nothing and restarts nothing. Managed config files go through `write_if_changed`, and services restart or reload only when it reports a change. Installs use `--no-upgrade`; upgrades happen only in `system/update.sh` (and `software/nodejs.sh` when `NODE_MAJOR` changes). Re-running reverts hand edits to managed files, so tune through the scripts.
+- **`bin/tune_php` only tunes versions named on the command line.** Its `opcache.validate_timestamps=0` serves stale code unless deploys reload PHP-FPM, so never make it tune every installed version by default.
+- **All scripts run as a non-root sudo user.**
+- **Each script gates on the one before it.** `provision-laravel-app-server.sh` requires `~/logs/setup-complete.log`, and `provision-dascentral.sh` requires the Laravel log.
+- **All scripts source `lib/config.sh`** for shared helpers and log paths. Logs and completion markers live under `~/logs`; each run replaces its previous log.
 - **PHP-FPM, Horizon, and app files all run as the admin user (not www-data).** Deliberate choice to avoid permission issues. Don't revert the pool config.
-- **MySQL 8.4 LTS from Oracle's APT repo, not Ubuntu's default.** MySQL 8.0 reached EOL in April 2026.
+- **MySQL 8.4 LTS from Ubuntu's 26.04 archive.** Oracle's `mysql-apt-config` does not support 26.04. The script switches root from `auth_socket` to the generated password and writes `~/.mysql_root_password` only after that succeeds.
 - **`opcache.validate_timestamps=0` is intentional.** The deploy pipeline reloads PHP-FPM after each deploy.
 
 ## Documentation Sync
 
-`provision/README.md` and `provision/provision-laravel-app-server.sh` must stay in sync:
-
-- Installed software list in the README's Phase 2 must match the script.
-- "Tuning decisions" in the README must match values in the script's tuning blocks.
-- Phase 3 post-install steps must remain accurate.
-
-When updating one, check the other. Drift between doc and script is the most likely failure mode.
-
-## Tuning
-
-Opinionated defaults, each documented in `provision/README.md` under "Tuning decisions." Update the README in the same commit when changing any of these:
-
-- Server timezone: UTC (set in `setup/system-defaults.sh`)
-- journald: 500MB cap (set in `setup/system-defaults.sh`)
-- Swap: configurable via `SWAP_SIZE_GB` env var, default 2 (set in `setup/system-defaults.sh`)
-- OPcache: 256MB memory, 20,000 file cap, `validate_timestamps=0`
-- realpath_cache: 4MB, 600s TTL
-- `innodb_buffer_pool_size`: sized to detected RAM (256MB / 512MB / 35% / 40% across tiers)
-
-Deliberately not tuned: Redis `maxmemory`, MySQL slow query log, PHP-FPM `pm.*` settings.
-
-## Pinned Dependencies
-
-Overridable env vars at the top of `provision-laravel-app-server.sh`:
-
-- `PHP_VERSION` (default 8.4)
-- `MYSQL_APT_CONFIG_VERSION` (default 0.8.34-1)
-
-Overridable env vars in `setup/`:
-
-- `SWAP_SIZE_GB` (default 2, in `system-defaults.sh`)
-- `NODE_MAJOR` (default 24, in `nodejs.sh`)
-
-If provisioning fails on the `repo.mysql.com` download, check [dev.mysql.com/downloads/repo/apt/](https://dev.mysql.com/downloads/repo/apt/) for the current version.
+`provision/README.md` must match the scripts: the Phase 2 software list and overridable settings, the "Tuning decisions" values, the "Maintaining existing servers" section, and the Phase 3 post-install steps. Update the README in the same commit as any script change it describes. Drift between doc and script is the most likely failure mode.
 
 ## Scope Boundaries
 
-These do not belong in either script:
+These do not belong in the provisioning scripts:
 
 - **Application deploy logic** (Nginx server blocks, Supervisor configs, logrotate). Lives in each app repo's `deploy/` folder.
 - **TLS certificates.** Manual post-install step; DNS must point at the droplet first.

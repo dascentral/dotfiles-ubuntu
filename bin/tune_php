@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+#
+# tune_php
+#
+# Apply the provisioned OPcache/realpath_cache tuning to the given PHP
+# versions (FPM and CLI) and restart a version's FPM only if its tuning
+# changed. Optional after provision/software/php.sh; provision-laravel-app-server.sh
+# runs it on new servers. Run it directly after changing a value.
+#
+# Versions must be named explicitly. The tuning sets
+# opcache.validate_timestamps=0, which needs a deploy pipeline that reloads
+# PHP-FPM, so it should never land on a PHP install by accident.
+#
+# Usage: tune_php <version> [version ...]   e.g. tune_php 8.4
+#
+
+set -euo pipefail
+
+source "${HOME}/.dotfiles/lib/config.sh"
+
+if (( $# == 0 )); then
+  usage "Usage: tune_php <version> [version ...]   e.g. tune_php 8.4"
+fi
+
+for version in "$@"; do
+  if [[ ! "$version" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    die "Not a PHP version: ${version}"
+  fi
+  if [[ ! -d "/etc/php/${version}" ]]; then
+    die "PHP ${version} is not installed (no /etc/php/${version})."
+  fi
+
+  section "PHP ${version} tuning (OPcache, realpath_cache)"
+  fpm_changed=false
+  for sapi in fpm cli; do
+    if [[ ! -d "/etc/php/${version}/${sapi}" ]]; then
+      continue
+    fi
+    if write_if_changed "/etc/php/${version}/${sapi}/conf.d/99-tuning.ini" <<'EOF'
+; Provisioned tuning
+opcache.memory_consumption=256
+opcache.interned_strings_buffer=16
+opcache.max_accelerated_files=20000
+opcache.validate_timestamps=0
+realpath_cache_size=4096K
+realpath_cache_ttl=600
+EOF
+    then
+      if [[ "$sapi" == fpm ]]; then fpm_changed=true; fi
+    fi
+  done
+
+  if [[ "$fpm_changed" == true ]] && systemctl is-active --quiet "php${version}-fpm"; then
+    sudo systemctl restart "php${version}-fpm"
+    ok "OPcache: 256MB / 20k files / no timestamp validation; realpath_cache: 4MB / 600s; php${version}-fpm restarted"
+  else
+    ok "OPcache: 256MB / 20k files / no timestamp validation; realpath_cache: 4MB / 600s"
+  fi
+done

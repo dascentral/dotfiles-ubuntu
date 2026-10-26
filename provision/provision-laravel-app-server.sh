@@ -4,7 +4,7 @@
 #
 # Provision an Ubuntu 26.04 LTS server for Laravel hosting:
 # - Nginx
-# - PHP 8.4-FPM
+# - PHP 8.4-FPM (software/php.sh, tuned with bin/tune_php)
 # - MySQL 8.4 LTS
 # - Redis
 # - Supervisor
@@ -20,7 +20,6 @@
 #
 # Optional environment variables:
 #   PHP_VERSION              defaults to 8.4
-#   MYSQL_APT_CONFIG_VERSION defaults to 0.8.34-1
 #   MYSQL_ROOT_PASSWORD      auto-generated if unset
 #
 
@@ -31,9 +30,8 @@ source "${HOME}/.dotfiles/lib/config.sh"
 # --- Configuration -----------------------------------------------------------
 
 PHP_VERSION="${PHP_VERSION:-8.4}"
-MYSQL_APT_CONFIG_VERSION="${MYSQL_APT_CONFIG_VERSION:-0.8.34-1}"
 
-LARAVEL_DIR="${DOTFILES}/provision/laravel"
+SOFTWARE_DIR="${DOTFILES}/provision/software"
 LOG_FILE="$LOG_PROVISION_LARAVEL"
 MYSQL_PASS_FILE="$HOME/.mysql_root_password"
 
@@ -53,11 +51,7 @@ if ! sudo -n true 2>/dev/null; then
   sudo -v
 fi
 
-if ! grep -q 'Ubuntu 26.04' /etc/os-release; then
-  warn "This script targets Ubuntu 26.04 LTS. Detected:"
-  grep PRETTY_NAME /etc/os-release >&2
-  exit 1
-fi
+require_ubuntu 26.04
 
 if [[ ! -f "$LOG_SETUP_COMPLETE" ]]; then
   die "setup.sh has not been run successfully. Run provision/setup.sh first."
@@ -67,21 +61,23 @@ ok "Running as $(whoami) on $(lsb_release -ds)"
 
 export DEBIAN_FRONTEND=noninteractive
 
-# --- System update -----------------------------------------------------------
+# --- Package index -----------------------------------------------------------
 
-section "System update"
+# Upgrades belong to setup.sh; modules here install with --no-upgrade so a
+# re-run on a live server doesn't upgrade (and restart) anything.
+section "Package index"
 sudo apt-get update -qq
-sudo apt-get upgrade -y -qq
-ok "System packages up to date"
+ok "Package index refreshed"
 
 # --- Run modules --------------------------------------------------------------
 
-source "${LARAVEL_DIR}/nginx.sh"
-source "${LARAVEL_DIR}/redis.sh"
-source "${LARAVEL_DIR}/supervisor.sh"
-source "${LARAVEL_DIR}/php.sh"
-source "${LARAVEL_DIR}/mysql.sh"
-source "${LARAVEL_DIR}/composer.sh"
+source "${SOFTWARE_DIR}/nginx.sh"
+source "${SOFTWARE_DIR}/redis.sh"
+source "${SOFTWARE_DIR}/supervisor.sh"
+"${SOFTWARE_DIR}/php.sh" "$PHP_VERSION"
+"${DOTFILES}/bin/tune_php" "$PHP_VERSION"
+source "${SOFTWARE_DIR}/mysql.sh"
+source "${SOFTWARE_DIR}/composer.sh"
 
 # --- Done --------------------------------------------------------------------
 

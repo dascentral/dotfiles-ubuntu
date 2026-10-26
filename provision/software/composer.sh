@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Sourced by setup.sh (every server) and provision-laravel-app-server.sh.
+# On a new server setup.sh runs before PHP exists, so the install happens
+# in the Laravel script and later bin/dotfiles runs keep Composer current.
+
 section "Composer"
 if command -v composer >/dev/null 2>&1; then
-  ok "Composer already installed: $(composer --version --no-ansi 2>/dev/null | head -n1)"
-else
+  sudo env COMPOSER_ALLOW_SUPERUSER=1 composer self-update --no-interaction --quiet
+  ok "$(composer --version --no-ansi 2>/dev/null | head -n1)"
+elif command -v php >/dev/null 2>&1; then
   EXPECTED_CHECKSUM="$(curl -fsSL https://composer.github.io/installer.sig)"
   php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php');"
   ACTUAL_CHECKSUM="$(php -r "echo hash_file('sha384', '/tmp/composer-setup.php');")"
@@ -15,5 +20,7 @@ else
   fi
   sudo php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer --quiet
   rm -f /tmp/composer-setup.php
-  ok "Composer $(composer --version --no-ansi 2>/dev/null | head -n1)"
+  ok "Installed $(composer --version --no-ansi 2>/dev/null | head -n1)"
+else
+  ok "PHP not installed; skipping Composer"
 fi

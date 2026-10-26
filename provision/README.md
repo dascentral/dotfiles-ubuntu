@@ -1,18 +1,20 @@
 # How to set up an Ubuntu Server
 
-**Last updated:** April 2026
-**Target OS:** Ubuntu 24.04 LTS (Noble Numbat)
+**Last updated:** October 2026
+**Target OS:** Ubuntu 26.04 LTS (Resolute Raccoon)
 **Stack:** Nginx, PHP 8.4-FPM, MySQL 8.4 LTS, Redis, Supervisor
 
 ## Introduction
 
-This document covers provisioning a hardened Ubuntu 24.04 droplet for Laravel application hosting. The bulk of the software install is automated by the companion `provision-laravel-app-server.sh` script (run after `setup.sh` has prepared the base system). Manual steps remain for anything that's risky to automate (SSH hardening) or requires per-host context (TLS certificates, application configuration).
+This document covers provisioning a hardened Ubuntu 26.04 droplet for Laravel application hosting. The bulk of the software install is automated by the companion `provision-laravel-app-server.sh` script (run after `setup.sh` has prepared the base system). Manual steps remain for anything that's risky to automate (SSH hardening) or requires per-host context (TLS certificates, application configuration).
 
 Recommended droplet size for a Laravel workload running Horizon, Pulse, and a Vite build pipeline: 4GB RAM, 2 vCPU. The 2GB tier reliably hits OOM during `composer install` or `npm run build` once any meaningful application traffic is present.
 
-## A note on MySQL versions
+## A note on package sources
 
-Ubuntu 24.04's default repositories ship MySQL 8.0, but 8.0 reached end of life on April 21, 2026. Run MySQL 8.4 LTS from Oracle's official APT repository instead. It's supported through 2032 and is the same line that Ubuntu 26.04 ships natively. The provision script handles the repo setup and a non-interactive install with `caching_sha2_password` as the default authentication plugin.
+PHP comes from Ondřej Surý's [packages.sury.org/php](https://packages.sury.org/php/) repository. His Launchpad PPA, which older servers use, does not publish for 26.04. The provision script installs his keyring package and adds the repo.
+
+MySQL 8.4 LTS comes from Ubuntu's own archive, since 26.04 ships it natively. It's supported through 2032. Ubuntu's package leaves root on `auth_socket`, so the script switches root to `caching_sha2_password` with a generated password.
 
 ## Tuning decisions
 
@@ -28,7 +30,7 @@ The script applies a small set of opinionated defaults rather than leaving every
 
 **`realpath_cache_size=4M`, `ttl=600`.** Laravel does a lot of filesystem work during bootstrap (autoloading, view resolution, config loading). Stock `realpath_cache_size` is 256K, which Laravel exhausts immediately. This is one of those changes where the difference is small per request but consistent across every request.
 
-**`innodb_buffer_pool_size` sized to detected RAM.** The MySQL default of 128MB is fine for a tutorial and painful for anything that joins. The script picks 256MB on a 1GB host, 512MB on 2GB, ~35% of RAM on 4GB, and ~40% on 8GB+. The percentages are below the conventional 50% recommendation because this is a shared application server, not a dedicated database host; FPM workers, Redis, Horizon, and the Vite-built asset serving all need their share too.
+**`innodb_buffer_pool_size` sized to detected RAM.** The MySQL default of 128MB is fine for a tutorial and painful for anything that joins. The script picks 256MB on a 1GB host, 512MB on 2GB, ~35% of RAM on 4GB, and ~40% on 8GB+, rounded down to a multiple of 128MB (InnoDB allocates the pool in 128MB chunks anyway, and rounding keeps small RAM-reporting changes after kernel updates from triggering a MySQL restart). The percentages are below the conventional 50% recommendation because this is a shared application server, not a dedicated database host; FPM workers, Redis, Horizon, and the Vite-built asset serving all need their share too.
 
 **What's deliberately not tuned.** Redis `maxmemory` is left at default because you'd want to separate cache and queue databases before applying an eviction policy, and that's an application decision rather than a server one. MySQL slow query log is observability tooling that belongs in a follow-up tuning pass. PHP-FPM `pm` settings (`pm.max_children`, etc.) are left at distro defaults because the right values depend on how big your application's per-process footprint actually is, which is easier to measure than to guess.
 
@@ -91,11 +93,11 @@ Switch to your administrative user, clone the dotfiles repo, and run the script.
 - A swap file sized to 2GB by default
 - Node.js 24 LTS via NodeSource
 - Nginx with a catch-all default server (rejects unknown Host/SNI)
-- PHP 8.4 with FPM and the standard Laravel extension set
-- MySQL 8.4 LTS from Oracle's official repository, non-interactive install
+- PHP 8.4 with FPM and the standard Laravel extension set, from packages.sury.org
+- MySQL 8.4 LTS from Ubuntu's archive, non-interactive install
 - Redis
 - Supervisor
-- Composer
+- Composer, which later `bin/dotfiles` runs keep current with `composer self-update`
 
 The script also applies a small set of opinionated tuning defaults; see the "Tuning decisions" section below for the what and the why.
 
@@ -107,9 +109,17 @@ cd ~/.dotfiles/provision
 ./provision-laravel-app-server.sh
 ```
 
-DigitalOcean's Ubuntu 24.04 image includes `git` out of the box, so the clone works on a fresh droplet. If you're ever provisioning on a more minimal image, install git first with `sudo apt-get update && sudo apt-get install -y git`.
+DigitalOcean's Ubuntu images include `git` out of the box, so the clone works on a fresh droplet. If you're ever provisioning on a more minimal image, install git first with `sudo apt-get update && sudo apt-get install -y git`.
 
-The script is idempotent for the most part. If it fails partway through, fix the cause and re-run; it will skip over what's already in place.
+A few settings can be overridden with environment variables when you run the scripts:
+
+- `SWAP_SIZE_GB` (default 2) sets the swap file size in `setup.sh`.
+- `NODE_MAJOR` (default 24) picks the Node.js LTS line in `setup.sh`.
+- `PHP_VERSION` (default 8.4) picks the PHP line in `provision-laravel-app-server.sh` and `provision-dascentral.sh`.
+- `MYSQL_ROOT_PASSWORD` (generated if unset) sets the MySQL root password.
+- `APP_USER` (default `forge`) names the application user in `provision-dascentral.sh`.
+
+Every script is safe to re-run, including on a live server. A re-run only changes what differs from the scripts, restarts a service only when its config file changed, and never upgrades packages (`bin/dotfiles` handles upgrades). If a run fails partway through, fix the cause and run it again. Re-running also puts managed files such as `99-tuning.cnf` back to what the scripts say, so make tuning changes in the scripts rather than by hand.
 
 A randomly generated MySQL root password is written to `~/.mysql_root_password` (mode 0600). Read it and store it in 1Password before doing anything else. The script logs its full output to `~/logs/provision-laravel.log`, replacing the previous run's log.
 
@@ -222,9 +232,28 @@ node --version                           # v24.x
 free -h                                  # confirm swap is allocated
 ```
 
+## Maintaining existing servers
+
+Only new 26.04 servers are provisioned from scratch. Existing 22.04 and 24.04 servers are maintained in place with two commands.
+
+**`bin/dotfiles`** pulls this repo and re-runs `setup.sh`, which works on any Ubuntu release. Each run applies package upgrades, moves Node.js to `NODE_MAJOR` when it changes, and runs `composer self-update`. Upgrades include patch releases for PHP, MySQL, Nginx, Redis, Supervisor, and Node.js, and a service restarts when its package is upgraded.
+
+Unattended upgrades only apply security updates from Ubuntu's own archive. PHP (packages.sury.org or the ondrej/php PPA) and Node.js (NodeSource) come from third-party repositories, so their security patches arrive only when you run `bin/dotfiles`. Run it regularly, and promptly after a PHP security release.
+
+**`~/.dotfiles/provision/software/php.sh <version>`** adds a newer PHP to a server on 22.04, 24.04, or 26.04. It uses the ondrej/php PPA on 22.04 and 24.04 and packages.sury.org on 26.04, installs the standard extension set, and starts the new FPM alongside the current one. It applies no tuning; that is the optional `tune_php` step below. The new pool copies the current pool's `user`, `group`, `listen.owner`, `listen.group`, and `env[HOME]`. The `php` CLI stays on the current version, and nothing is switched over: the script prints the cutover steps (Nginx socket, `update-alternatives`, deploy reload and sudoers, queue workers, disabling the old FPM). Until the Nginx socket changes, the old version keeps serving, so the install is safe to run on a live server. From PHP 8.5 the script skips the `opcache` package, since OPcache is compiled into core.
+
+**`tune_php <version> [version ...]`** writes the OPcache and realpath_cache tuning described above to each named version's FPM and CLI `99-tuning.ini`, and restarts that version's FPM only if the file changed. The Laravel provision script runs it on new servers. On an existing server it is optional after installing a new PHP, and you can run it any time after changing a tuning value. It never guesses which versions to tune: `opcache.validate_timestamps=0` assumes a deploy pipeline that reloads PHP-FPM, so only name versions that deploy that way.
+
+Ondřej has announced that 22.04 and 24.04 users will be moved from the Launchpad PPA to packages.sury.org. When that happens, `software/php.sh` needs to follow.
+
+**MySQL on older servers.** Check `mysql --version`. A server still on Ubuntu's MySQL 8.0 is past end of life (April 21, 2026). Moving to 8.4 LTS from [Oracle's APT repository](https://dev.mysql.com/downloads/repo/apt/) is an in-place upgrade that can't be rolled back, so take a full backup first.
+
+**Ubuntu 22.04 reaches end of standard support in April 2027.** Reaching 26.04 in place takes two release upgrades, so replacing a 22.04 server with a freshly provisioned 26.04 droplet is usually less work.
+
 ## Resources
 
 - DigitalOcean: [Initial Server Setup with Ubuntu 24.04](https://www.digitalocean.com/community/tutorials/initial-server-setup-with-ubuntu-24-04)
 - DigitalOcean: [How To Install Linux, Nginx, MySQL, PHP (LEMP) on Ubuntu 24.04](https://www.digitalocean.com/community/tutorials/how-to-install-linux-nginx-mysql-php-lemp-stack-on-ubuntu-24-04)
-- Ondrej Sury PHP PPA: [launchpad.net/~ondrej/+archive/ubuntu/php](https://launchpad.net/~ondrej/+archive/ubuntu/php)
-- MySQL 8.4 LTS download: [dev.mysql.com/downloads/repo/apt](https://dev.mysql.com/downloads/repo/apt/)
+- Ondřej Surý PHP PPA (22.04/24.04, used by `software/php.sh`): [launchpad.net/~ondrej/+archive/ubuntu/php](https://launchpad.net/~ondrej/+archive/ubuntu/php)
+- Ondřej Surý PHP repo (26.04): [packages.sury.org/php](https://packages.sury.org/php/)
+- Oracle MySQL APT repo (upgrading older servers): [dev.mysql.com/downloads/repo/apt](https://dev.mysql.com/downloads/repo/apt/)
