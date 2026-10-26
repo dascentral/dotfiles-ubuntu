@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 #
-# install_php
+# software/php.sh
 #
-# Install a PHP-FPM version with the standard Laravel extension set and the
-# provisioned OPcache/realpath tuning (via tune_php). Used by provision-laravel-app-server.sh
-# on new servers and run directly to add a newer PHP to an existing one.
+# Install a PHP-FPM version with the standard Laravel extension set. Tuning
+# is a separate, optional step: run bin/tune_php afterwards.
+#
+# Unlike the other software/ modules, this one is executed rather than
+# sourced: it takes the version as an argument and is also run on its own
+# to add a newer PHP to an existing server, so it does its own setup.
+# provision-laravel-app-server.sh runs it on new servers.
 #
 # On a server that already has PHP, the new version installs alongside it:
 # its FPM pool copies the current pool's user, group, listen owner, and
@@ -13,7 +17,7 @@
 #
 # Supports Ubuntu 22.04, 24.04, and 26.04.
 #
-# Usage: install_php 8.5
+# Usage: ~/.dotfiles/provision/software/php.sh 8.5
 #
 
 set -euo pipefail
@@ -23,7 +27,7 @@ source "${HOME}/.dotfiles/lib/config.sh"
 PHP_VERSION="${1:-}"
 
 if [[ ! "$PHP_VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then
-  usage "Usage: install_php <version>   e.g. install_php 8.5"
+  usage "Usage: ${DOTFILES}/provision/software/php.sh <version>   e.g. 8.5"
 fi
 
 require_ubuntu 22.04 24.04 26.04
@@ -82,8 +86,6 @@ else
   ok "PHP ${PHP_VERSION} installed"
 fi
 
-"${DOTFILES}/bin/tune_php" "$PHP_VERSION"
-
 # --- FPM pool ----------------------------------------------------------------
 
 FPM_CHANGED=false
@@ -129,7 +131,12 @@ if [[ -n "$CURRENT_PHP" && "$CURRENT_PHP" != "$PHP_VERSION" ]]; then
   section "PHP ${PHP_VERSION} is installed alongside ${CURRENT_PHP}"
   cat <<EOF
 
-Nothing has been switched over. To move this server to ${PHP_VERSION}:
+Nothing has been switched over, and no tuning has been applied. To move
+this server to ${PHP_VERSION}:
+
+  0. Optional: apply the provisioned OPcache/realpath tuning. It sets
+     opcache.validate_timestamps=0, so only if deploys reload PHP-FPM:
+       tune_php ${PHP_VERSION}
 
   1. Point each app's Nginx server block (in its deploy/nginx folder) at
        fastcgi_pass unix:/run/php/php${PHP_VERSION}-fpm.sock;

@@ -1,6 +1,6 @@
 # Provisioning
 
-`setup.sh` prepares any Ubuntu server and is re-run day-to-day via `bin/dotfiles`, including on the existing 22.04 and 24.04 servers. `provision-laravel-app-server.sh` runs after it on a new 26.04 server, and `provision-dascentral.sh` runs after that. Modules live in `system/` (base OS), `software/` (one per piece of software), and `shell/` (your zsh environment); the entry scripts decide which to source, so a module can be shared, like `software/composer.sh`. `bin/install_php` installs PHP for the Laravel script and is also run directly to add a newer PHP to existing servers. It calls `bin/tune_php`, which owns the PHP tuning values. `provision/README.md` is the human-facing guide and documents every tuning value, overridable setting, and maintenance command.
+`setup.sh` prepares any Ubuntu server and is re-run day-to-day via `bin/dotfiles`, including on the existing 22.04 and 24.04 servers. `provision-laravel-app-server.sh` runs after it on a new 26.04 server, and `provision-dascentral.sh` runs after that. Modules live in `system/` (base OS), `software/` (one per piece of software), and `shell/` (your zsh environment); the entry scripts decide which to source, so a module can be shared, like `software/composer.sh`. `software/php.sh` installs PHP for the Laravel script and is also run directly to add a newer PHP to existing servers, so unlike the other modules it is executed with a version argument rather than sourced. It only installs; `bin/tune_php` owns the PHP tuning values and is a separate, optional step that the Laravel script applies on new servers. `provision/README.md` is the human-facing guide and documents every tuning value, overridable setting, and maintenance command.
 
 ## Hard Constraints
 
@@ -8,7 +8,7 @@ These are load-bearing. Do not remove without an explicit conversation.
 
 - **`setup.sh` targets Ubuntu (any version).** The OS guard checks for Ubuntu generically.
 - **Only new 26.04 servers are provisioned.** `provision-laravel-app-server.sh` and `provision-dascentral.sh` guard on `require_ubuntu 26.04`. Don't add branches for older releases there.
-- **`bin/install_php` supports 22.04, 24.04, and 26.04** because it maintains existing servers. It installs alongside the current PHP and never switches over: no Nginx socket changes, and the `php` CLI stays pinned to the current version.
+- **`software/php.sh` supports 22.04, 24.04, and 26.04** because it maintains existing servers. It installs alongside the current PHP and never switches over: no Nginx socket changes, and the `php` CLI stays pinned to the current version.
 - **Every script and module is safe to re-run on a live server.** A second run on an unchanged server changes nothing and restarts nothing. Managed config files go through `write_if_changed`, and services restart or reload only when it reports a change. Installs use `--no-upgrade`; upgrades happen only in `system/update.sh` (and `software/nodejs.sh` when `NODE_MAJOR` changes). Re-running reverts hand edits to managed files, so tune through the scripts.
 - **`bin/tune_php` only tunes versions named on the command line.** Its `opcache.validate_timestamps=0` serves stale code unless deploys reload PHP-FPM, so never make it tune every installed version by default.
 - **All scripts run as a non-root sudo user.**

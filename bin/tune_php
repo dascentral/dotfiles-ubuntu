@@ -4,7 +4,8 @@
 #
 # Apply the provisioned OPcache/realpath_cache tuning to the given PHP
 # versions (FPM and CLI) and restart a version's FPM only if its tuning
-# changed. Called by install_php; run it directly after changing a value.
+# changed. Optional after provision/software/php.sh; provision-laravel-app-server.sh
+# runs it on new servers. Run it directly after changing a value.
 #
 # Versions must be named explicitly. The tuning sets
 # opcache.validate_timestamps=0, which needs a deploy pipeline that reloads

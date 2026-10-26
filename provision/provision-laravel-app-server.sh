@@ -4,7 +4,7 @@
 #
 # Provision an Ubuntu 26.04 LTS server for Laravel hosting:
 # - Nginx
-# - PHP 8.4-FPM (via bin/install_php)
+# - PHP 8.4-FPM (software/php.sh, tuned with bin/tune_php)
 # - MySQL 8.4 LTS
 # - Redis
 # - Supervisor
@@ -74,7 +74,8 @@ ok "Package index refreshed"
 source "${SOFTWARE_DIR}/nginx.sh"
 source "${SOFTWARE_DIR}/redis.sh"
 source "${SOFTWARE_DIR}/supervisor.sh"
-"${DOTFILES}/bin/install_php" "$PHP_VERSION"
+"${SOFTWARE_DIR}/php.sh" "$PHP_VERSION"
+"${DOTFILES}/bin/tune_php" "$PHP_VERSION"
 source "${SOFTWARE_DIR}/mysql.sh"
 source "${SOFTWARE_DIR}/composer.sh"
 

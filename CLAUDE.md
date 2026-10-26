@@ -7,11 +7,11 @@ Personal dotfiles and infrastructure-as-text for Ubuntu servers running Laravel 
 - `provision/setup.sh`: idempotent system customization entrypoint (sources modules from `provision/system/`, `provision/software/`, and `provision/shell/`). Invoked day-to-day via `bin/dotfiles`.
 - `provision/system/`: base system modules: `update.sh`, `utilities.sh`, `defaults.sh`, `security.sh`.
 - `provision/shell/`: your shell environment: `zsh.sh` installs zsh, Oh My Zsh, and plugins, and symlinks the dotfiles in `shell/`.
-- `provision/software/`: one module per piece of software: `composer.sh`, `mysql.sh`, `nginx.sh`, `nodejs.sh`, `redis.sh`, `supervisor.sh`. Entry scripts choose which to source.
-- `provision/provision-laravel-app-server.sh`: one-shot Laravel app server provisioning (Nginx, PHP, MySQL, Redis, Supervisor, Composer). Sources modules from `provision/software/` and runs `bin/install_php`. See `provision/CLAUDE.md`.
+- `provision/software/`: one module per piece of software: `composer.sh`, `mysql.sh`, `nginx.sh`, `nodejs.sh`, `php.sh`, `redis.sh`, `supervisor.sh`. Entry scripts choose which to source; `php.sh` is executed instead, with a version argument.
+- `provision/provision-laravel-app-server.sh`: one-shot Laravel app server provisioning (Nginx, PHP, MySQL, Redis, Supervisor, Composer). Sources modules from `provision/software/`, runs `provision/software/php.sh`, then applies `bin/tune_php`. See `provision/CLAUDE.md`.
 - `provision/provision-dascentral.sh`: dascentral.com app dependencies, run after the Laravel script.
 - `lib/`: shared shell library: `config.sh` (loader), `colors.sh`, `functions.sh`.
-- `bin/`: user-facing commands on `PATH` (`dotfiles`, `a`, `install_php`, `tune_php`, `validate_redis_security`, etc.).
+- `bin/`: user-facing commands on `PATH` (`dotfiles`, `a`, `tune_php`, `validate_redis_security`, etc.).
 - `shell/`: `.zshrc`, `.aliases`, plus `sudoers.d/php-fpm`.
 - `legacy/`: archived reference. Don't extend.
 
