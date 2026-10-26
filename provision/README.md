@@ -24,6 +24,8 @@ The script applies a small set of opinionated defaults rather than leaving every
 
 **journald capped at 500MB.** Default behavior is to use up to 10% of the filesystem, which on a long-running droplet quietly grows into multi-gigabyte territory and is the kind of thing you only notice when disk pressure starts causing other problems.
 
+**`vm.swappiness=10`.** The stock value of 60 lets the kernel push PHP-FPM workers and MySQL buffers out to swap while there's still free memory to reclaim from the page cache. At 10, the swap file stays a safety net against OOM kills instead of a steady source of latency.
+
 **OPcache memory raised to 256MB and file cap raised to 20,000.** Defaults are 128MB and 10,000. Laravel's vendor tree plus your application code will exceed 10,000 files without much effort, and silent OPcache eviction shows up as inexplicable slowness rather than an obvious error.
 
 **OPcache `validate_timestamps=0`.** The single biggest production OPcache win. PHP stops checking whether files have changed on every request. The trade-off is that deploys must reload PHP-FPM to pick up new code; without that reload, the server keeps serving the old version indefinitely. Add `sudo systemctl reload php8.4-fpm` to the post-deploy SSH commands in your GitHub Actions workflow.
